@@ -1,0 +1,66 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+
+# build output
+/build/
+/dist/
+
+# local environment and logs
+.env*
+!.env.example
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# local credentials and agent settings
+/.aws/
+/.codex/
+/.agents/
+/.ssh/
+.npmrc
+.netrc
+credentials.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# documentation and design references are backed up separately
+/docs/
+
+# caches and local test/browser artifacts
+/.cache/
+/.playwright/
+/.playwright-cli/
+/coverage/
+/playwright-report/
+/test-results/
+/blob-report/
+/tmp/
+/temp/
+.impeccable/hook.cache.json
+.impeccable/hook.pending.json
+.impeccable/config.local.json
+
+# TypeScript
+*.tsbuildinfo
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

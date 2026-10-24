@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "createdAt": "2026-10-24T06:14:47.878Z",
+        "reason": "MapSilip designer screenshots across admin, light/dark, login, and account-request screens use lettering consistent with the existing Montserrat family; confirmed by direct visual comparison."
+      }
+    ]
+  }
+}
