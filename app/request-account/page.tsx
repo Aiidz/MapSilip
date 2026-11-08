@@ -1,5 +1,5 @@
 import { AuthPreview } from "../components/AuthPreview";
 
 export default function RequestAccountPage() {
-  return <AuthPreview request />;
+  return <AuthPreview request refineAuth />;
 }

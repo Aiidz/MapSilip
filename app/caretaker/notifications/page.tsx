@@ -1,3 +1,5 @@
-import { CaretakerNotifications } from "../CaretakerPages";
+import { NotificationWorkspace } from '../../components/NotificationWorkspace';
 
-export default function CaretakerNotificationsPage() { return <CaretakerNotifications />; }
+export default function CaretakerNotificationsPage() {
+  return <NotificationWorkspace area="caretaker" />;
+}

@@ -1,0 +1,11 @@
+.env*
+docs/
+.next/
+node_modules/
+backups/
+tests/
+.agents/
+.aws/
+.codex/
+.impeccable/
+.playwright-cli/

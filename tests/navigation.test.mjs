@@ -29,3 +29,11 @@ test("does not select a partial path match", () => {
     false,
   );
 });
+
+test("profile shortcuts open the current role's profile page", async () => {
+  const { profilePathForArea } = await import("../app/lib/navigation.mjs");
+
+  assert.equal(profilePathForArea("tenant"), "/tenant/profile");
+  assert.equal(profilePathForArea("management"), "/management/profile");
+  assert.equal(profilePathForArea("caretaker"), "/caretaker/profile");
+});

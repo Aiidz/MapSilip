@@ -1,3 +1,3 @@
-import { CaretakerDashboard } from "./CaretakerPages";
+import { DashboardOverview } from '../components/DashboardOverview';
 
-export default function CaretakerDashboardPage() { return <CaretakerDashboard />; }
+export default function CaretakerDashboardPage() { return <DashboardOverview role="caretaker" />; }

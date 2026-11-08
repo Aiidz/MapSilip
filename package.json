@@ -9,17 +9,24 @@
     "visual:review": "node scripts/visual-review.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/navigation.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "security:preflight": "node scripts/security-preflight.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "0.9.0",
+    "@supabase/supabase-js": "2.102.0",
     "next": "^16.4.2",
+    "pg": "8.16.3",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pg": "8.15.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/web-push": "3.6.4",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.4.2",
     "playwright": "1.64.1",

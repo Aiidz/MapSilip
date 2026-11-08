@@ -18,6 +18,7 @@ export type IconName =
   | "moon"
   | "sun"
   | "download"
+  | "analytics"
   | "dashboard"
   | "map"
   | "thermometer"
@@ -26,7 +27,8 @@ export type IconName =
   | "filter"
   | "logout"
   | "eye"
-  | "eyeOff";
+  | "eyeOff"
+  | "info";
 
 export function Icon(
   { name, ...props }: SVGProps<SVGSVGElement> & { name: IconName },
@@ -45,6 +47,8 @@ export function Icon(
   };
 
   const paths: Record<IconName, ReactNode> = {
+    info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
+    analytics: <><path d="M4 3v17h17" /><path d="m7 14 4-4 4 2 6-7" /></>,
     home: (
       <>
         <path d="m3 10 9-7 9 7" />

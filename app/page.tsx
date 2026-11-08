@@ -1,5 +1,7 @@
-import { AuthPreview } from "./components/AuthPreview";
+import { resumeSignedInPortal } from "./lib/backend/resume-session";
+import { redirect } from "next/navigation";
 
-export default function HomePage() {
-  return <AuthPreview />;
+export default async function HomePage() {
+  await resumeSignedInPortal();
+  redirect("/login");
 }

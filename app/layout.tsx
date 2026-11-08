@@ -10,12 +10,12 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "MapSilip — Dormitory living, made simpler",
+  title: "MapSilip",
   description: "A thoughtful home base for dormitory life.",
   applicationName: "MapSilip",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icon.svg",
+    icon: "/mapsilip-logo-mark.svg",
     apple: "/apple-touch-icon.png",
   },
 };

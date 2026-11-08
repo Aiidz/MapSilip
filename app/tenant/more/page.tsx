@@ -35,12 +35,6 @@ const links = [
     href: "/tenant/preferences",
     icon: "bell" as const,
   },
-  {
-    title: "Management workspace",
-    description: "Dormitory operations and records.",
-    href: "/management",
-    icon: "building" as const,
-  },
 ];
 
 export default function TenantMorePage() {

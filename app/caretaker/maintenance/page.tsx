@@ -1,3 +1,5 @@
-import { CaretakerMaintenance } from "../CaretakerPages";
+import { CaretakerMaintenance } from '../CaretakerPages';
 
-export default function CaretakerMaintenancePage() { return <CaretakerMaintenance />; }
+export default function CaretakerMaintenancePage() {
+  return <CaretakerMaintenance />;
+}

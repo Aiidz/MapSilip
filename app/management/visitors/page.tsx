@@ -1,14 +1,6 @@
-import { FeaturePreview } from "../../components/FeaturePreview";
+import { OperationalWorkspace } from '../../components/OperationalWorkspace';
 
 export default function ManagementVisitorsPage() {
-  return (
-    <FeaturePreview
-      title="Visitors"
-      description="A simple, scannable view of planned visit details."
-      icon="calendar"
-      sectionTitle="Planned visits"
-      emptyTitle="No planned visits to display"
-      emptyDescription="Planned visits will appear here."
-    />
-  );
+  return <OperationalWorkspace title="Visitors" description="Review planned resident visits."
+    role="owner" resources={['visits']} />;
 }

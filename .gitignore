@@ -25,12 +25,14 @@ pnpm-debug.log*
 /.codex/
 /.agents/
 /.ssh/
+/.certs/
 .npmrc
 .netrc
 credentials.json
 service-account*.json
 *.pem
 *.key
+*.crt
 *.p12
 *.pfx
 *.jks
@@ -64,3 +66,4 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.vercel

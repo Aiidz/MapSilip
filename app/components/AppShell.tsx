@@ -3,9 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { isNavigationItemActive } from "../lib/navigation.mjs";
+import { PwaManager } from "./PwaManager";
+import { SidebarProfileCard } from "./SidebarProfileCard";
 import { Icon, type IconName } from "./Icon";
+import { ThemeToggle } from "./ThemeToggle";
 import { ManagementToolbar } from "./ManagementToolbar";
 import { ToolbarPopovers } from "./ToolbarPopovers";
 
@@ -28,8 +31,9 @@ const navigation: Record<Area, NavItem[]> = {
     { label: "Room Management", mobileLabel: "Rooms", href: "/management/rooms", icon: "map" },
     { label: "Maintenance Map", href: "/management/maintenance", icon: "thermometer" },
     { label: "Payment Record", mobileLabel: "Payments", href: "/management/payments", icon: "receipt" },
+    { label: "Concerns & Suggestions", mobileLabel: "Concerns", href: "/management/concerns", icon: "sparkles" },
+    { label: "Analytics", href: "/management/analytics", icon: "analytics" },
     { label: "Notifications", href: "/management/notifications", icon: "bell" },
-    { label: "Tenants", href: "/management/tenants", icon: "users" },
     { label: "Visitors", href: "/management/visitors", icon: "calendar" },
     { label: "More", href: "/management/more", icon: "more" },
   ],
@@ -44,7 +48,7 @@ const navigation: Record<Area, NavItem[]> = {
 const managementMobileNavigation = [
   "/management",
   "/management/rooms",
-  "/management/tenants",
+  "/management/maintenance",
   "/management/payments",
   "/management/more",
 ];
@@ -80,21 +84,10 @@ function Brand({ area }: { area: Area }) {
   );
 }
 
-function TenantToolbar() {
-  const [dark, setDark] = useState<boolean | null>(null);
-  function toggleTheme() {
-    const current = document.documentElement.dataset.theme
-      ? document.documentElement.dataset.theme === "dark"
-      : window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const next = !current;
-    document.documentElement.dataset.theme = next ? "dark" : "light";
-    setDark(next);
-  }
+function TenantToolbar({ authEnabled }: { authEnabled: boolean }) {
   return <div className="tenant-toolbar" aria-label="Tenant tools">
-    <button className="toolbar-icon" type="button" onClick={toggleTheme} aria-label={dark === null ? "Toggle color theme" : `Switch to ${dark ? "light" : "dark"} theme`} title="Switch color theme">
-      {dark === null ? <span className="toolbar-theme-icons"><Icon name="sun" className="toolbar-theme-icons__sun" /><Icon name="moon" className="toolbar-theme-icons__moon" /></span> : <Icon name={dark ? "sun" : "moon"} />}
-    </button>
-    <ToolbarPopovers area="tenant" />
+    <ThemeToggle />
+    <ToolbarPopovers area="tenant" tenantAuthEnabled={authEnabled} />
   </div>;
 }
 
@@ -110,7 +103,7 @@ function NavLinks({ area, mobile = false }: { area: Area; mobile?: boolean }) {
     ? managementMobileNavigation.flatMap((href) =>
       navigation.management.filter((item) => item.href === href)
     )
-    : navigation[area];
+    : navigation[area].filter((item) => item.label !== "More");
   return (
     <nav
       className={mobile ? "mobile-nav" : "side-nav"}
@@ -138,37 +131,39 @@ function NavLinks({ area, mobile = false }: { area: Area; mobile?: boolean }) {
 
 function PortalPageContent({ pathname, children }: { pathname: string; children: ReactNode }) {
   const previousPath = useRef(pathname);
-  const [transitionPath, setTransitionPath] = useState<string | null>(null);
+  const element = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (previousPath.current === pathname) return;
     previousPath.current = pathname;
-    setTransitionPath(pathname);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // Keep the page mounted and fixed sheets anchored to the viewport.
+    const animation = element.current?.animate?.([{ opacity: .92 }, { opacity: 1 }], {
+      duration: 320, easing: 'cubic-bezier(.22, .61, .36, 1)',
+    });
+    return () => animation?.cancel();
   }, [pathname]);
 
-  const entering = transitionPath !== null;
   return (
-    <div
-      key={transitionPath ?? "initial"}
-      className={`portal-page-content${entering ? " portal-page-content--enter" : ""}`}
-    >
+    <div ref={element} className="portal-page-content">
       {children}
     </div>
   );
 }
 
 export function AppShell(
-  { area, children }: { area: Area; children: ReactNode },
+  { area, children, staffAuthEnabled = false, tenantAuthEnabled = false, authenticatedUserId, pushEnabled = false }: { authenticatedUserId?: string; pushEnabled?: boolean; area: Area; children: ReactNode; staffAuthEnabled?: boolean; tenantAuthEnabled?: boolean },
 ) {
   const isTenant = area === "tenant";
-  const isCaretaker = area === "caretaker";
   const pathname = usePathname();
   return (
     <div className={`app-shell app-shell--${area}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="mobile-topbar">
         <Brand area={area} />
-        <ToolbarPopovers area={area} compact />
+        <div className="mobile-topbar__actions"><ThemeToggle />
+          <ToolbarPopovers area={area} compact staffAuthEnabled={staffAuthEnabled} tenantAuthEnabled={tenantAuthEnabled} />
+        </div>
       </header>
 
       <aside className="desktop-sidebar">
@@ -177,37 +172,22 @@ export function AppShell(
           MENU
         </div>
         <NavLinks area={area} />
-        <div className="sidebar-bottom">
-          {!isCaretaker && <Link
-            className="mode-link"
-            href={isTenant ? "/management" : "/tenant"}
-          >
-            {isTenant ? "Management workspace" : "Tenant home"}
-            <Icon name="arrow" />
-          </Link>}
-        </div>
+        <SidebarProfileCard area={area} />
       </aside>
 
       <main className="main-content" id="main-content" tabIndex={-1}>
-        {isTenant && <TenantToolbar />}
+        {isTenant && <TenantToolbar authEnabled={tenantAuthEnabled} />}
         <div className="content-wrap">
-          {!isTenant && <ManagementToolbar area={area} />}
+          {!isTenant && <ManagementToolbar area={area} staffAuthEnabled={staffAuthEnabled} />}
           <PortalPageContent pathname={pathname}>{children}</PortalPageContent>
           <footer className="page-footer">
             <span>MapSilip</span>
+            {authenticatedUserId && <PwaManager key={authenticatedUserId} userId={authenticatedUserId} pushEnabled={pushEnabled} />}
             <span>Designed for dorm life, wherever you are.</span>
           </footer>
         </div>
       </main>
 
-      {!isCaretaker && <nav className="mobile-mode-switch" aria-label="Switch workspace">
-        <Link href="/tenant" aria-current={isTenant ? "page" : undefined}>
-          Tenant
-        </Link>
-        <Link href="/management" aria-current={!isTenant ? "page" : undefined}>
-          Management
-        </Link>
-      </nav>}
       <NavLinks area={area} mobile />
     </div>
   );

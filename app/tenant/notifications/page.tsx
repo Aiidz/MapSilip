@@ -1,5 +1,5 @@
-import { TenantNotifications } from "../../components/TenantWorkspace";
+import { NotificationWorkspace } from '../../components/NotificationWorkspace';
 
 export default function TenantNotificationsPage() {
-  return <TenantNotifications />;
+  return <NotificationWorkspace area="tenant" />;
 }

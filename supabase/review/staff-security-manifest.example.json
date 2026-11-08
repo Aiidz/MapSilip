@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "projectRef": "atuqxpiandeutimdkgag",
+  "approval": {
+    "status": "draft",
+    "approvedBy": "",
+    "approvedAt": ""
+  },
+  "approvedHashes": {
+    "supabase/review/staff-authorization.sql": "bc44b1674ccea0f87618686850f957bf44ed0007b1f7cd70ef1fe0ff511d4303",
+    "supabase/review/staff-probes.sql": "0de4fede32110d17deda2aadd395eed4df86240ec0d08149d273ca464825163c",
+    "supabase/review/staff-storage-probes.sql": "13304c36ec6478d7ea343f654353112123ea859e6b81a949413e6f5548decce7",
+    "supabase/review/staff-security-verification.md": "c37c2bf3d7a5318d5df2fc73da05287291e065beb8704d39d909ec399f9db437",
+    "supabase/review/README.md": "707523bf1a8336fab12c6e4c0637001d62163de0d2851d9980e05ad02fcb0598",
+    "scripts/security-preflight.mjs": "fe29dc335f162709da116b7ecb3863c7a6c9fa30b04d8d1a6550846fff0ea408",
+    "scripts/lib/security-preflight.mjs": "11287d7faf5e93249127784b250b7a13b4e0a6ec0a473f6f7098978515f7d58e"
+  },
+  "scope": {
+    "check": "auth-health-get-only",
+    "writesAllowed": false
+  }
+}

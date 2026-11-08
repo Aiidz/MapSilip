@@ -2,42 +2,23 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useId, useState } from "react";
-import { Icon } from "./Icon";
+import { useState } from "react";
+import { FirstLoginForm, LoginForm } from "./StaffAuthForms";
+import { TenantRecoveryForm, TenantResetForm } from "./TenantPasswordForms";
+import { AccountRequestForm } from "./AccountRequestForm";
 
-function Field({ label, placeholder, type = "text", optional = false }: {
-  label: string;
-  placeholder: string;
-  type?: string;
-  optional?: boolean;
+export function AuthPreview({ request = false, firstLogin = false, recovery = false, reset = false, refineLogin = false, refineAuth = false }: {
+  request?: boolean; firstLogin?: boolean; recovery?: boolean; reset?: boolean; refineLogin?: boolean; refineAuth?: boolean;
 }) {
-  const id = useId();
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const isPassword = type === "password";
+  const [recoverySent, setRecoverySent] = useState(false);
+  const title = request ? "Create Account" : firstLogin ? "Change Password" : recovery ? recoverySent ? "Check your email" : "Reset Password" : reset ? "Choose a New Password" : "Log In";
+  const pageClass = [
+    "auth-page",
+    refineLogin ? "auth-page--login" : refineAuth ? "auth-page--refined" : "",
+    request && refineAuth ? "auth-page--request" : "",
+  ].filter(Boolean).join(" ");
   return (
-    <div className="auth-field">
-      <label htmlFor={id}>{label}{optional && <small> (Optional)</small>}</label>
-      {isPassword ? (
-        <div className="auth-field__input-wrap">
-          <input id={id} type={passwordVisible ? "text" : "password"} placeholder={placeholder} />
-          <button
-            className="auth-password-toggle"
-            type="button"
-            aria-label={`${passwordVisible ? "Hide" : "Show"} ${label.toLowerCase()}`}
-            aria-pressed={passwordVisible}
-            onClick={() => setPasswordVisible((visible) => !visible)}
-          >
-            <Icon name={passwordVisible ? "eyeOff" : "eye"} />
-          </button>
-        </div>
-      ) : <input id={id} type={type} placeholder={placeholder} />}
-    </div>
-  );
-}
-
-export function AuthPreview({ request = false }: { request?: boolean }) {
-  return (
-    <main className="auth-page">
+    <main className={pageClass}>
       <div className="auth-orb auth-orb--top" aria-hidden="true" />
       <div className="auth-orb auth-orb--red" aria-hidden="true" />
       <div className="auth-orb auth-orb--dark" aria-hidden="true" />
@@ -54,33 +35,31 @@ export function AuthPreview({ request = false }: { request?: boolean }) {
             />
           </Link>
           <p className="auth-product-name">Dormitory Management System</p>
-          {!request && <h1>Hello,<br /><strong>welcome!</strong></h1>}
+          {(refineLogin
+            ? <p className="auth-greeting">Hello,<br /><strong>welcome!</strong></p>
+            : <h1>Hello,<br /><strong>welcome!</strong></h1>)}
         </aside>
-        <section className="auth-form-side">
+        <section className="auth-form-side" aria-labelledby={refineLogin ? "login-heading" : undefined}>
           <div className="auth-form-card">
-            <h2>{request ? "Create Account" : "Log In"}</h2>
-            <p className="auth-form-card__intro">{request ? "Fill in your details to get started." : "Enter your credentials to access your account."}</p>
+            {refineLogin ? <h1 id="login-heading">{title}</h1> : <h2>{title}</h2>}
+            {!(recovery && recoverySent) && <p className="auth-form-card__intro">{request ? "Fill in your details to get started." : firstLogin ? "Replace your temporary password to continue." : recovery ? "Enter your account email to request a password reset link." : reset ? "Choose a new password for your account." : "Enter your email and password to access MapSilip."}</p>}
             {request ? (
               <>
-                <h3 className="auth-section-title">Personal Information</h3>
-                <div className="auth-row">
-                  <Field label="First Name" placeholder="First name" />
-                  <Field label="Last Name" placeholder="Last name" />
-                </div>
-                <Field label="Middle Name" placeholder="Middle name" optional />
-                <Field label="Contact Number" placeholder="09XX XXX XXXX" type="tel" />
-                <h3 className="auth-section-title">Account Information</h3>
-            <Field label="Email Address" placeholder="you@example.com" type="email" />
-                <Field label="Password" placeholder="Enter password" type="password" />
-                <Field label="Confirm Password" placeholder="Confirm password" type="password" />
-                <button className="auth-submit" type="button" disabled>Create Account</button>
+                <AccountRequestForm />
                 <p className="auth-switch">Already have an account? <Link href="/login">Log In</Link></p>
               </>
+            ) : firstLogin ? (
+              <>
+                <FirstLoginForm />
+                <p className="auth-switch"><Link href="/login">Return to Log In</Link></p>
+              </>
+            ) : recovery ? (
+              <TenantRecoveryForm onSentChange={setRecoverySent} />
+            ) : reset ? (
+              <TenantResetForm />
             ) : (
               <>
-                <Field label="Email Address" placeholder="you@example.com" type="email" />
-                <Field label="Password" placeholder="Enter password" type="password" />
-                <button className="auth-submit" type="button" disabled>Log In</button>
+                <LoginForm />
                 <div className="auth-divider" />
                 <p className="auth-switch">Don&apos;t have a tenant account?</p>
                 <Link className="auth-request-link" href="/request-account">Request Tenant Account</Link>

@@ -3,3 +3,7 @@ export function isNavigationItemActive(
   href: string,
   exact?: boolean,
 ): boolean;
+
+export function profilePathForArea(
+  area: 'tenant' | 'management' | 'caretaker',
+): string;

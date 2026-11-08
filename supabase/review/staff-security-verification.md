@@ -1,0 +1,71 @@
+# Staff security review and verification package
+
+**State:** the approved authorization and RLS fixture SQL batches are applied to MapSilip and recorded in remote migration history as `20261025081017 staff_authorization` and `20261025081034 staff_security_probes`. The authorization tables are empty; the two public probe tables each contain one fixed synthetic marker row. No Auth test identity, account mapping, executor password, bucket, Storage object, or production setting has been provisioned. Anonymous GET, HEAD, and snapshot-RPC requests returned HTTP 401. Authenticated positive controls and all session/security behavior remain unverified. Staff Auth remains disabled; keep `MAPSILIP_STAFF_AUTH_ENABLED` unset or `false`.
+
+## Files and exact proposed changes
+
+1. `staff-authorization.sql` is one additive transaction. It creates the `mapsilip_security_executor` LOGIN role without a password; private staff accounts, session admissions, attempts, rate-limit and audit tables; triggers; non-locking STABLE read predicates/snapshot; and VOLATILE admission, completion, revocation and limiter commands. Client roles receive no table write grants. The executor receives only named command grants. The migration requires `current_user = 'postgres'`, aborts on an existing role name, and has a catalog guard for unexpected executable SECURITY DEFINER functions. It creates no accounts or business records.
+2. `staff-probes.sql` is an independent optional RLS fixture, not a migration. It creates two public marker tables with one fixed synthetic marker row each and SELECT policies for staff-read and owner-only finance-read. It aborts on table-name collisions and does not touch Storage.
+3. `staff-storage-probes.sql` is an independent optional Storage fixture, not a migration. It creates the private 1 MiB `text/plain` test bucket plus two policies: owner-path `object.upload` and `object.get_authenticated`. It aborts if the bucket name or any Storage object policy collides. It creates no Storage object. No UPDATE, DELETE, list-wide, signed-URL, public, copy or move policy is added.
+
+The authorization and RLS fixture SQL were accepted by the hosted PostgreSQL migration service. No local PostgreSQL server/parser was available. The Storage policy SQL remains unexecuted and unvalidated. The upload policy uses Supabase's operation-aware helper because Storage reuses SQL privileges across API operations. Supabase documents exact operation matching and normalizes `storage.object.upload` / `object.upload` forms in its [Storage helper reference](https://supabase.com/docs/guides/storage/schema/helper-functions) and lists the current operations in its [Storage operation source](https://github.com/supabase/storage/blob/master/src/http/routes/operations.ts).
+
+The security-definer functions are explicitly owned by `postgres` and use an empty `search_path`; the public snapshot wrapper is SECURITY INVOKER. The private schema is revoked from public/client roles. The final migration guard checks effective schema usage and function EXECUTE on the executor for callable SECURITY DEFINER functions outside the exact executor allowlist, excluding the non-callable event-trigger return type. Re-run the equivalent catalog guard before adding/changing SQL functions or grants. The executor role inherits PUBLIC privileges; catalog inspection and this guard are important because those privileges cannot be denied to one role while retained for others. This does not make the executor credential safe to disclose.
+
+## Local guarded read-only preflight
+
+The command is intentionally limited to one Auth health request. It does not connect to Postgres, execute candidate SQL, inspect users, call RLS/RPC, access Storage, or perform writes.
+
+1. Review both fixture files, the authorization SQL, this verification file and `README.md`. Copy the draft metadata in `staff-security-manifest.example.json` to `staff-security-manifest.json` only after separately approving this exact read-only preflight.
+2. Set only the approval fields to `status: "approved"`, a reviewer name and an ISO timestamp. Keep the project reference, exact seven-file hash set, `auth-health-get-only` scope and `writesAllowed: false`. Any SQL, instruction, or harness-file hash change invalidates approval.
+3. From the repository root, run:
+
+   ```bash
+   MAPSILIP_RUN_SECURITY_PREFLIGHT=1 npm run security:preflight
+   ```
+
+The script loads `.env.local` with Next's `@next/env`, validates the exact project reference and publishable-key format, then sends only `GET {project-url}/auth/v1/health` with that key in `apikey`. Redirects are not followed; no response body is read. It reports only status/reachability and suppresses headers and network details. Missing, draft, unapproved, unexpected-field, project-mismatched or stale-hash manifests are rejected before network access. It accepts only the exact reviewed file set and a read-only scope. The template remains `draft`; no approved runtime manifest is present by default. This local guard is not independent proof of human approval or project ownership. Auth health says nothing about PostgreSQL, RLS, Storage or staff security.
+
+There is no write command in this harness. The preflight is separate from the authorization and RLS batch already applied. Identity/credential setup remains pending; Storage and cleanup are outside the approved scope.
+
+## SQL validation limits
+
+The workspace has `psql` 18.6, but no responding local PostgreSQL server (`pg_isready` reports no response), `postgres`/`initdb`, Supabase CLI or installed SQL parser. Docker was not started. The authorization and RLS SQL batches were accepted by hosted PostgreSQL, confirming that those batches parsed and applied. The Storage candidate remains unexecuted. The MCP tool does not document transaction rollback/partial-failure guarantees for explicit `BEGIN`/`COMMIT`; an ambiguous future migration result must be inspected before retry. Auth/session/RLS positive-control behavior remains unverified.
+
+## Synthetic identities and executor credential procedure
+
+The two identities, account mappings and executor password are still pending. The connected MCP has no Auth-user creation or credential-setting tool, and this workspace has no executor database URL or rate-limit HMAC key. Create exactly two synthetic Auth users manually in the Supabase Dashboard, one owner and one caretaker, each with a unique `.invalid` email and temporary password held in a password manager. Mark email confirmed only as needed to test the no-email-verification flow. Add only their UUIDs to `mapsilip_private.accounts` with `status = 'active'`; leave `password_change_required` at its default `true`. Set the executor password interactively with `psql` `\password mapsilip_security_executor`. Store only the executor URL and rate-limit HMAC key in local/deployment secret stores. Do not use real people, send email or place passwords in SQL, shell arguments, logs, chat or source control. The RLS fixture contains fixed synthetic markers; the Storage fixture remains unapplied.
+
+The migration creates the executor with no password. After it is reviewed and applied under approval, an authorized project database administrator can set its password interactively using PostgreSQL `psql`'s `\password mapsilip_security_executor` command. PostgreSQL documents that this prompts, encrypts, and avoids the cleartext password appearing in command history or server logs ([psql `\password`](https://www.postgresql.org/docs/18/app-psql.html#APP-PSQL-META-COMMAND-PASSWORD)). Start `psql` without a password in its connection URI/arguments; use its hidden connection-password prompt or an approved credential manager. Generate the executor password once in a password manager, enter it at both hidden prompts, and retain it there. Build the executor connection URL only in a local secret store or ignored `.env.local` as `MAPSILIP_SECURITY_DATABASE_URL`; never put it in a migration, shell history, CI output or `NEXT_PUBLIC_*` variable. The server-only rate-limit HMAC key also belongs in that secret store. No password or service-role key is part of the harness or SQL.
+
+## Hosted verification status and remaining work
+
+| Stage | Status | Evidence or stop condition |
+| --- | --- | --- |
+| Authorization SQL | Applied with MCP `apply_migration`; remote history contains `20261025081017 staff_authorization`. | Catalog confirms the executor role and five empty RLS-enabled private tables. |
+| RLS fixture | Applied with MCP `apply_migration`; remote history contains `20261025081034 staff_security_probes`. | Two marker tables have one fixed synthetic row each and SELECT policies. Anonymous GET, HEAD, and snapshot RPC returned HTTP 401. |
+| Synthetic identities and mappings | Pending manual Dashboard setup. | Exactly one owner and one caretaker `.invalid` identity; both active and password-change-restricted. |
+| Executor credential and app secrets | Pending secure interactive setup. | `MAPSILIP_SECURITY_DATABASE_URL` and `MAPSILIP_RATE_LIMIT_HASH_KEY` are absent locally. |
+| Auth/session/RLS positive controls | Not run. | Requires the two identities, account mappings and executor credential. |
+| Storage tests | Deferred and excluded from the approved batch. | No bucket, policy, or object was created. |
+| Staff Auth activation | Disabled. | Keep `MAPSILIP_STAFF_AUTH_ENABLED` unset or `false` until required hosted tests pass and activation is separately approved. |
+
+Supabase MCP `apply_migration` was used for both approved SQL files; its success responses were confirmed through remote migration history and catalog inspection. The MCP tool does not document rollback/partial-failure guarantees for the explicit `BEGIN`/`COMMIT` wrappers. A failed or ambiguous future call must stop; inspect remote migration history and object state before any retry. The repository still has no hosted Auth/RLS/concurrency test harness. Local tests are offline unit/static tests and do not prove hosted security.
+
+## Hosted test matrix (synthetic users only)
+
+| Area | Positive controls | Required denials and failure cases |
+| --- | --- | --- |
+| Auth/sign-in | Both synthetic identities can authenticate with their temporary credentials and receive restricted first-login state only. | Bad password, unknown/non-staff identity, deactivated account, rate-limit exhaustion/outage, DB outage and malformed origin fail safely; no operational cookie/access is returned before admission. |
+| First-login completion | Auth confirms password update; global sign-out succeeds; one fresh sign-in yields exactly one session; completion admits only its current session/revision. A lost DB response reconciles only the same completed attempt/session/revision. | Wrong/current-equals-new/weak password, Auth timeout/uncertain result, global-revocation uncertainty, stale or expired attempt, replay, forged client flags, wrong subject, unchanged/fake session, revision change, multiple live sessions and completion DB uncertainty all remain denied. |
+| GET/HEAD + STABLE RPC | Admitted owner and caretaker read the staff marker through REST GET and HEAD; `staff_access_snapshot` succeeds in read-only access mode. | Anonymous, restricted, stale-revision and deactivated tokens see no marker/authority. Owner alone sees the finance marker. Auth roles cannot call executor-only completion/write RPCs or directly mutate private tables. Test repeated requests using direct HTTP, not only app routes. |
+| Old sessions/deactivation/reissue | Newly admitted session works; after deactivation/reissue commits, subsequent REST/RPC operations are denied. | Retained old access token cannot regain admission; retained refresh token cannot yield an admitted descendant. Re-test after refresh and after concurrent reissue/deactivation. |
+| Concurrency | Use two database connections with an explicit barrier to race admission/completion against deactivation, credential reissue, and admission revocation; record each outcome and transaction order. | A stale revision never becomes admitted. Verify reads begun before deactivation separately: STABLE, non-locking RLS predicates cannot lock against updates or promise cancellation of an already-running statement. Do not claim linearizable cancellation of in-flight reads. |
+| Private Storage | Owner can standard-upload a generated text object under the owner UUID path and authenticated-download it. | Caretaker, anonymous, restricted, stale, deactivated, and wrong-user callers cannot upload/read. Verify object list, signed URL creation/access, public URL, transform, upsert, update, delete, copy, move, signed upload, resumable/TUS and multipart paths are denied. Exact `object.upload` and `object.get_authenticated` are the only intended operations. |
+| Recovery | A known committed completion is retried through the idempotent reconciliation path and returns the exact original result. | Unknown commit, cookie serialization failure, executor-role mismatch, Auth/DB partial failure and concurrent account changes do not issue uncertain operational cookies or clear the restriction. Retries must never repeat an uncertain Auth mutation automatically. |
+
+Catalog/RLS policy inspection is only setup evidence; it is not a substitute for the REST/Auth/Storage positive and negative runtime controls. Expected RLS denials may be HTTP 200 with zero rows; every such denial must have a matching positive control. Test `HEAD` and STABLE RPC under an actual read-only request context. Do not use an elevated key for API tests. Never log passwords, JWTs, cookies, signed URLs, receipt contents or unnecessary personal data. Do not reset, drop, or clean up the project; preserve and record approved synthetic resources for separate reviewed cleanup.
+
+## Remaining approval gate
+
+The approved authorization and RLS batches are applied. Identity creation, account mappings, executor-secret provisioning, authenticated security tests, Storage fixtures, cleanup and feature activation remain separate. No real account, operational data, bucket or Storage object was created. Keep `MAPSILIP_STAFF_AUTH_ENABLED` unset or `false` until the hosted security gate passes and separate activation is approved.

@@ -1,3 +1,3 @@
-import { CaretakerProfile } from "../CaretakerPages";
+import { ProfileEditor } from '../../components/ProfileEditor';
 
-export default function CaretakerProfilePage() { return <CaretakerProfile />; }
+export default function CaretakerProfilePage() { return <ProfileEditor role="caretaker" />; }

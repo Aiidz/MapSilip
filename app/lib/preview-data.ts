@@ -27,7 +27,7 @@ export const previewItems = {
       {
         title: "Applications",
         description: "Review tenant applications and records.",
-        href: "/management/tenants",
+        href: "/management?accessRequests=1",
         icon: "users",
       },
       {
