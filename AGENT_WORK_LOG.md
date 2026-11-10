@@ -319,6 +319,8 @@ Enhance the UI of the popups in tenant view for payment, maintenance, concerns, 
   - Redesigned `SubmissionForm` for Payments, Maintenance, and Concerns with the new controls, clean input styling, auto-stamped Manila payment date, and room badge.
 - **File changed:** `app/components/VisitorFormPreview.tsx`
   - Integrated `CalendarDatePicker` for the visit date, modernized the planned arrival/departure time row, and streamlined labels.
+- **File changed:** `app/components/ui.tsx`
+  - Added optional `description?: string` to `UiDialogProps` to support descriptive subheaders in custom modal dialogs.
 - **File changed:** `app/globals.css`
   - Added classes for `.tenant-modal-form`, `.tenant-custom-dropdown`, `.tenant-dropzone`, `.tenant-calendar-picker`, and smooth scale/fade animations.
 - **File created:** `tests/tenant-popups-ui.test.mjs`
@@ -326,10 +328,16 @@ Enhance the UI of the popups in tenant view for payment, maintenance, concerns, 
 - **Files created:**
   - `docs/superpowers/specs/2026-11-10-tenant-popups-enhancement-design.md`
   - `docs/superpowers/plans/2026-11-10-tenant-popups-enhancement.md`
+- **Visual Artifacts:**
+  - `live-payment-modal.png`: Live rendered screenshot of Payment Proof modal.
+  - `live-maintenance-modal.png`: Live rendered screenshot of Maintenance Request modal.
+  - `live-concerns-modal.png`: Live rendered screenshot of Concerns & Suggestions modal.
+  - `live-visitor-modal.png`: Live rendered screenshot of Visitor Request modal with interactive Calendar UI.
+  - `tenant-popup-ui-preview.md`: Presentation artifact for modal UI review.
 
 ### Verification
 - `npm run lint`: 0 errors, 1 pre-existing warning in `RoomContextPanel.tsx`.
-- `npm run typecheck`: Passed.
+- `npm run typecheck`: Passed (0 errors).
 - `node --test tests/tenant-popups-ui.test.mjs`: 4 passed, 0 failed.
 - `npm test`: 302 passed, 15 skipped, 0 failed.
 - `npm run build`: Production build compiled successfully in Turbopack.
@@ -361,13 +369,37 @@ Fix font sizing across all pages and surfaces to make them more modern, legible,
 ### Changes
 - **File changed:** `app/globals.css`
   - Upgraded global typography scale and set minimum legible floors:
-    - Base body font: Bumped from 15px to 15.5px with 1.6 line height.
-    - Global Shell & Navigation: Desktop sidebar links enlarged from 12px to 14.5px, captions from 9px to 11.5px (750 weight, .08em spacing), topbar search from 12px to 14px, profile text from 11px to 13.5px, mobile nav labels from 10px to 11.5px.
-    - Interactive Controls: Buttons updated from 12px/13px to 14px/14.5px (650 weight), input fields/textareas/selects from 11px-13px to 14px-14.5px (preventing mobile zoom and improving accessibility), labels from 11px-12px to 13px-13.5px.
-    - Cards & Panels: Panel headers updated to 16.5px-17.5px, subheadings from 12px to 13.5px, stat panel titles from 10px to 12px, values 22px-32px, empty state titles to 14.5px-15.5px.
-    - Tables & Lists: Table headers enlarged from 10px-13px to 13.5px (650 weight), cell secondary timestamps/room tags from 10px to 11.5px-12.5px, status badges from 10px-11px to 12px.
-    - Tenant, Management & Caretaker Portals: Tenant overview, details DL lists (dt 12.5px, dd 14px), contract viewers (13px), management payment summary cards (14.5px titles, 12px subtitles), and directory modal details (dt 12px, dd 14px).
-    - Mobile Media Queries (`@media (max-width: 699px)`, `@media (max-width: 559px)`, `@media (max-width: 420px)`): Removed aggressive 8px–10px shrinkages, enforcing a minimum legible floor of 11.5px–12.5px for secondary metadata on mobile.
+
+| UI Surface / Element | Previous Size | New Modern Size | Weight / Line-Height |
+|---|---|---|---|
+| Base Body (`body`) | `15px` | `15.5px` | Regular, `line-height: 1.6` |
+| Sidebar Navigation Links (`.side-nav .nav-link`) | `12px` | `14.5px` | `550` |
+| Sidebar Section Captions (`.sidebar-caption`) | `9px` | `11.5px` | `750`, `letter-spacing: .08em` |
+| Mobile Bottom Nav Links (`.nav-link`) | `10px` | `11.5px` | `650` |
+| Topbar Search Input (`.toolbar-search input`) | `12px` | `14px` | Regular |
+| Topbar Profile & Avatar (`.toolbar-profile`) | `11px` | `13.5px` | `650` (avatar: `12.5px`) |
+| Primary / Secondary Buttons (`.button`, `.button--primary`, `.button--secondary`) | `12px`–`13px` | `14px`–`14.5px` | `650`, `min-height: 42px` |
+| Tenant Hero Action Button (`.tenant-hero-action`) | `13px` | `14px` | `650`, `min-height: 42px` |
+| Form Labels (`label`) | `11px`–`12px` | `13px`–`13.5px` | `600` |
+| Form Inputs, Textareas, Selects (`input`, `textarea`, `select`) | `11px`–`13px` | `14px`–`14.5px` | Regular, `min-height: 42px–44px` |
+| Filter Pills (`.tenant-filter`, `.caretaker-filters button`) | `10px`–`11px` | `13px` | `650`, `min-height: 35px–36px` |
+| Panel & Card Headers (`.panel__heading h2`, `.context-panel h2`) | `15px`–`16px` | `16.5px`–`18.5px` | `650` / `700` |
+| Stat Panel Numbers & Labels (`.stat-panel`) | `9px`–`10px` label | `11.5px`–`12px` label, `22px`–`32px` value | `650` |
+| Table Headers (`.payment-table th`) | `10px`–`13px` | `13.5px` (desktop), `12px` (mobile) | `650` |
+| Table Subtitles & Timestamps (`time`, `.payment-submitted-time`) | `10px`–`11px` | `11.5px`–`12.5px` | Regular |
+| Status Badges (`.status-badge`, `.payment-status`, `.tenant-payment-status`) | `10px`–`11px` | `12px`–`12.5px` | `650` |
+| Tenant Details DL Lists (`dt`, `dd`) | `dt: 12px`, `dd: 13px` | `dt: 12.5px`, `dd: 14px` | `dd: 650` |
+| Management Payment Summary Cards | `12px` / `10px` | `13.5px`–`14.5px` / `12px` | `650` |
+| Directory Dialog Meta & Details (`.tenant-directory__details`) | `dt: 11px`, `dd: 13px` | `dt: 12px`, `dd: 14px` | `dd: 700` |
+| App Settings (`.app-settings h3`, `p`, badge) | `14px` / `12px` / `11px` | `15.5px` / `13.5px` / `12.5px` | `h3: 600`, `badge: 650` |
+| Mobile Media Queries (`max-width: 699px`, `559px`, `420px`) | `8px`–`10px` | `11.5px`–`12.5px` minimum floor | Eliminates unreadable micro-text |
+
+- **Visual Artifacts:**
+  - `verified-typography-tenant-payments.png`: Verified typography scale on Tenant Payments page.
+  - `verified-typography-mgmt-payments.png`: Verified typography scale on Management Payments board.
+  - `verified-typography-tenant-details.png`: Verified typography scale on Tenant My Details surface.
+  - `verified-typography-mobile-390px.png`: Verified mobile viewport (390px) typography and spacing.
+  - `typography-modernization-preview.md`: Detailed presentation artifact with responsive carousels.
 
 ### Verification
 - `npm test`: 302 passed, 15 skipped, 0 failed.
