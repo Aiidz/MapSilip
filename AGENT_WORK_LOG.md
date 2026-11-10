@@ -295,3 +295,41 @@ Record all work completed for the mobile popup correction and deployment.
 ## Future entries
 
 (Add new entries below this line.)
+
+
+---
+
+## 2026-11-10 — Modernize tenant request popups & calendar UI
+
+### Request
+Enhance the UI of the popups in tenant view for payment, maintenance, concerns, and visitor requests:
+- Implement custom dropdown menus using the project's details/summary pattern.
+- Auto-stamp the payment date on upload/submission without an unnecessary calendar.
+- Modernize the file upload zone with a dashed dropzone layout, file details, and remove action.
+- Build an interactive, modern calendar date picker for visitor requests.
+- Add smooth entrance and interactive transitions with light/dark theme parity.
+- Keep icons minimal and copy concise.
+
+### Changes
+- **File created:** `app/components/TenantFormControls.tsx`
+  - `TenantDropdown`: Accessible custom dropdown using `<details>` and `<summary>` with chevron rotation, listbox menu, and checkmark. Includes hidden input for native form payload.
+  - `TenantFileDropzone`: Modern dashed upload area with drag-and-drop, title, subtitle, file details badge, and remove button.
+  - `CalendarDatePicker`: Modern accessible calendar popover for visitor date selection with month navigation, day grid, today marker, and past-date disabling.
+- **File changed:** `app/components/TenantWorkspace.tsx`
+  - Redesigned `SubmissionForm` for Payments, Maintenance, and Concerns with the new controls, clean input styling, auto-stamped Manila payment date, and room badge.
+- **File changed:** `app/components/VisitorFormPreview.tsx`
+  - Integrated `CalendarDatePicker` for the visit date, modernized the planned arrival/departure time row, and streamlined labels.
+- **File changed:** `app/globals.css`
+  - Added classes for `.tenant-modal-form`, `.tenant-custom-dropdown`, `.tenant-dropzone`, `.tenant-calendar-picker`, and smooth scale/fade animations.
+- **File created:** `tests/tenant-popups-ui.test.mjs`
+  - Added unit test suite covering dropdown hidden inputs, file dropzone states, calendar date formatting, and visitor modal integration.
+- **Files created:**
+  - `docs/superpowers/specs/2026-11-10-tenant-popups-enhancement-design.md`
+  - `docs/superpowers/plans/2026-11-10-tenant-popups-enhancement.md`
+
+### Verification
+- `npm run lint`: 0 errors, 1 pre-existing warning in `RoomContextPanel.tsx`.
+- `npm run typecheck`: Passed.
+- `node --test tests/tenant-popups-ui.test.mjs`: 4 passed, 0 failed.
+- `npm run build`: Production build compiled successfully in Turbopack.
+- Generated live rendered screenshots for all 4 popups using Playwright.

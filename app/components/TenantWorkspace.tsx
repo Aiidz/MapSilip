@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { createLatestRequest, fetchOperationRows } from '../lib/workspace-loading';
 import { Icon } from './Icon';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
+import { TenantDropdown, TenantFileDropzone } from './TenantFormControls';
 import { EmptyState, PageHeader, Panel } from './ui';
 
 type Kind = 'payments' | 'maintenance' | 'concerns';
@@ -38,12 +39,65 @@ async function upload(file: File, purpose: 'payment' | 'maintenance') {
   return value.id as string;
 }
 
-function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
-  kind: Kind; invoices: Row[]; open: boolean; onClose: () => void; onSaved: () => void;
+function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
+  kind: Kind; invoices: Row[]; roomLabel?: string; open: boolean; onClose: () => void; onSaved: () => void;
 }) {
-  const [busy,setBusy] = useState(false);
-  const [message,setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+
+  // Form field states
+  const [invoiceIdOverride, setInvoiceIdOverride] = useState<string | null>(null);
+  const [amountOverride, setAmountOverride] = useState<string | null>(null);
+  const [method, setMethod] = useState('gcash');
+  const [category, setCategory] = useState(kind === 'maintenance' ? 'Furniture & Fixtures' : 'Cleanliness & Sanitation');
+
+  const selectedInvoice = invoiceIdOverride ?? (invoices[0] ? String(invoices[0].id) : '');
+  const activeInvoice = invoices.find((inv) => String(inv.id) === selectedInvoice);
+  const amount = amountOverride ?? (activeInvoice?.amount ? String(activeInvoice.amount) : '');
+
+  const handleInvoiceChange = (id: string) => {
+    setInvoiceIdOverride(id);
+    const found = invoices.find((inv) => String(inv.id) === id);
+    if (found?.amount) setAmountOverride(String(found.amount));
+  };
+
+  const invoiceOptions = invoices.length
+    ? invoices.map((row) => ({
+        value: String(row.id),
+        label: `${String(row.coverage_start)} to ${String(row.coverage_end)} · ${String(row.amount)} ${String(row.currency || 'PHP')}`,
+      }))
+    : [{ value: '', label: 'No pending invoice' }];
+
+  const methodOptions = [
+    { value: 'gcash', label: 'GCash' },
+    { value: 'bank_transfer', label: 'Bank transfer' },
+  ];
+
+  const maintenanceCategories = [
+    { value: 'Furniture & Fixtures', label: 'Furniture & Fixtures' },
+    { value: 'Plumbing', label: 'Plumbing' },
+    { value: 'Electrical', label: 'Electrical' },
+    { value: 'AC/HVAC', label: 'AC / HVAC' },
+    { value: 'Structural & Locks', label: 'Structural & Locks' },
+    { value: 'General', label: 'General' },
+  ];
+
+  const concernCategories = [
+    { value: 'Cleanliness & Sanitation', label: 'Cleanliness & Sanitation' },
+    { value: 'Rules & Regulations', label: 'Rules & Regulations' },
+    { value: 'Roommate & Visitor Concerns', label: 'Roommate & Visitor Concerns' },
+    { value: 'Safety & Privacy', label: 'Safety & Privacy' },
+    { value: 'General Feedback', label: 'General Feedback' },
+  ];
+
+  const todayFormatted = new Intl.DateTimeFormat('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'Asia/Manila',
+  }).format(new Date());
+
   function close() { setMessage(''); onClose(); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (busy) return;
@@ -74,30 +128,150 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
   return <ResponsiveOverlay
     open={open}
     onClose={close}
-    title={kind === 'payments' ? 'Submit payment proof' : kind === 'maintenance' ? 'Submit maintenance request' : 'Share a concern'}
-    description={kind === 'payments' ? 'Attach your receipt and reference number for review.' : kind === 'maintenance' ? 'Tell us what needs attention and add a photo if helpful.' : 'Your feedback goes directly to the dormitory team.'}
+    title={kind === 'payments' ? 'Submit payment proof' : kind === 'maintenance' ? 'New maintenance request' : 'New concern or suggestion'}
     variant="dialog"
   >
     <div className="tenant-form-panel tenant-form-panel--bare">
-    <form onSubmit={submit}>
-      {kind === 'payments' ? <>
-        <label>Payment period<select name="invoice_id" required defaultValue=""><option value="" disabled>Select invoice</option>{invoices.map(row =>
-          <option key={String(row.id)} value={String(row.id)}>{String(row.coverage_start)} to {String(row.coverage_end)} · {String(row.amount)} {String(row.currency)}</option>)}</select></label>
-        <div className="tenant-form-row"><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Payment date<input type="date" value={new Date().toISOString().slice(0,10)} readOnly /></label></div>
-        <label>Payment method<select name="method" required defaultValue=""><option value="" disabled>Select a method</option><option value="gcash">GCash</option><option value="bank_transfer">Bank transfer</option></select></label>
-        <label>Reference number<input name="reference_number" minLength={3} maxLength={100} required /></label>
-        <label>Receipt or proof<input name="file" type="file" accept="image/jpeg,image/png,application/pdf" required /></label>
-      </> : <>
-        {kind === 'maintenance' && <label>Category<select name="category" defaultValue="" required><option value="" disabled>Select category</option>
-          {['Plumbing','Electrical','AC/HVAC','Furniture & Fixtures','Structural & Locks','General'].map(value => <option key={value}>{value}</option>)}
-        </select></label>}
-        {kind === 'concerns' && <label>Type<input name="category" minLength={2} maxLength={80} placeholder="Concern or suggestion type" required /></label>}
-        <label>Description<textarea name="description" rows={5} minLength={10} maxLength={2000} required /></label>
-        {kind === 'maintenance' && <label>Photo or document (optional)<input name="file" type="file" accept="image/jpeg,image/png,application/pdf" /></label>}
-      </>}
-      <button className="button button--primary" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit'}</button>
-      {message && <p role="alert">{message}</p>}
-    </form>
+      <form onSubmit={submit} className="tenant-modal-form">
+        {kind === 'payments' ? (
+          <>
+            <label>
+              <span>Payment period</span>
+              <TenantDropdown
+                name="invoice_id"
+                value={selectedInvoice}
+                onChange={handleInvoiceChange}
+                options={invoiceOptions}
+                placeholder="Select invoice"
+                required
+              />
+            </label>
+            <div className="tenant-form-row">
+              <label>
+                <span>Amount</span>
+                <input
+                  name="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmountOverride(e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+              </label>
+              <label>
+                <span>Payment date</span>
+                <div className="tenant-readonly-field">{todayFormatted} · Auto-stamped</div>
+                <input type="hidden" name="payment_date" value={new Date().toISOString().slice(0, 10)} />
+              </label>
+            </div>
+            <label>
+              <span>Payment method</span>
+              <TenantDropdown
+                name="method"
+                value={method}
+                onChange={setMethod}
+                options={methodOptions}
+                required
+              />
+            </label>
+            <label>
+              <span>Reference number</span>
+              <input
+                name="reference_number"
+                minLength={3}
+                maxLength={100}
+                placeholder="Enter reference number"
+                required
+              />
+            </label>
+            <label>
+              <span>Receipt proof</span>
+              <TenantFileDropzone
+                name="file"
+                accept="image/jpeg,image/png,application/pdf"
+                required
+                title="Choose receipt file"
+                subtitle="JPG, PNG or PDF up to 2MB"
+              />
+            </label>
+            <button className="button button--primary" type="submit" disabled={busy}>
+              {busy ? 'Submitting…' : 'Submit for verification'}
+            </button>
+          </>
+        ) : kind === 'maintenance' ? (
+          <>
+            <label>
+              <span>Category</span>
+              <TenantDropdown
+                name="category"
+                value={category}
+                onChange={setCategory}
+                options={maintenanceCategories}
+                required
+              />
+            </label>
+            {roomLabel && (
+              <label>
+                <span>Room location</span>
+                <div className="tenant-readonly-field">{roomLabel}</div>
+              </label>
+            )}
+            <label>
+              <span>Description</span>
+              <textarea
+                name="description"
+                rows={4}
+                minLength={10}
+                maxLength={2000}
+                placeholder="Describe the repair needed..."
+                required
+              />
+            </label>
+            <label>
+              <span>Photo or document (optional)</span>
+              <TenantFileDropzone
+                name="file"
+                accept="image/jpeg,image/png,application/pdf"
+                title="Choose photo or document"
+                subtitle="JPG, PNG or PDF up to 2MB"
+              />
+            </label>
+            <button className="button button--primary" type="submit" disabled={busy}>
+              {busy ? 'Submitting…' : 'Submit Request'}
+            </button>
+          </>
+        ) : (
+          <>
+            <label>
+              <span>Category</span>
+              <TenantDropdown
+                name="category"
+                value={category}
+                onChange={setCategory}
+                options={concernCategories}
+                required
+              />
+            </label>
+            <label>
+              <span>Description</span>
+              <textarea
+                name="description"
+                rows={5}
+                minLength={10}
+                maxLength={2000}
+                placeholder="Describe your concern or suggestion..."
+                required
+              />
+            </label>
+            <button className="button button--primary" type="submit" disabled={busy}>
+              {busy ? 'Submitting…' : 'Submit Concern'}
+            </button>
+          </>
+        )}
+        {message && <p role="alert">{message}</p>}
+      </form>
     </div>
   </ResponsiveOverlay>;
 }
@@ -142,7 +316,18 @@ export function TenantWorkspace({ kind }: { kind: Kind }) {
   const paymentStatus = (status: unknown) => status === 'approved' ? 'Verified' : status === 'pending' ? 'Under Review' : status === 'rejected' ? 'Rejected' : pretty(status);
   return <div className={`tenant-workspace tenant-workspace--${kind}`}>
     <PageHeader title={item.title} description={item.description} />
-    <SubmissionForm key={kind} kind={kind} invoices={invoices} open={showForm} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />
+    <SubmissionForm
+      key={kind}
+      kind={kind}
+      invoices={invoices}
+      roomLabel={summary?.room ? `Room ${summary.room}` : undefined}
+      open={showForm}
+      onClose={() => setShowForm(false)}
+      onSaved={() => {
+        setShowForm(false);
+        void load();
+      }}
+    />
     {kind === 'payments' && <section className="tenant-payment-overview" aria-labelledby="next-payment-title">
       <div className="tenant-overview-content"><span className="tenant-summary-icon tenant-summary-icon--solid"><Icon name="wallet" /></span><div><p className="tenant-section-label">Next rent payment</p><h2 id="next-payment-title">{invoice ? paymentAmount(invoice.amount,invoice.currency) : '—'}</h2><p>{invoice ? `${paymentMonth(invoice.coverage_start)} · Due ${paymentDate(invoice.due_on)}` : 'No upcoming invoice is available.'}</p></div></div>
       <button className="tenant-hero-action" type="button" onClick={() => setShowForm(true)} aria-expanded={showForm}>{item.action}</button>

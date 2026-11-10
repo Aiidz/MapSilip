@@ -8,14 +8,14 @@ export function PageHeader({
   action,
 }: {
   title: string;
-  description: string;
+  description?: string;
   action?: ReactNode;
 }) {
   return (
     <header className="page-header">
       <div>
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description ? <p>{description}</p> : null}
       </div>
       {action ? <div className="page-header__action">{action}</div> : null}
     </header>
@@ -87,18 +87,20 @@ export function PreviewNote(
 export function EmptyState(
   { title, description, icon = "sparkles" }: {
     title: string;
-    description: string;
+    description?: string;
     icon?: IconName;
   },
 ) {
   return (
     <div className="empty-state">
-      <span className="empty-state__icon">
-        <Icon name={icon} />
-      </span>
+      {icon ? (
+        <span className="empty-state__icon">
+          <Icon name={icon} />
+        </span>
+      ) : null}
       <div>
         <h3>{title}</h3>
-        <p>{description}</p>
+        {description ? <p>{description}</p> : null}
       </div>
     </div>
   );
@@ -129,7 +131,7 @@ export function PreviewCard({
   icon,
 }: {
   title: string;
-  description: string;
+  description?: string;
   href: string;
   icon: IconName;
 }) {
@@ -140,7 +142,7 @@ export function PreviewCard({
       </span>
       <span className="preview-card__copy">
         <strong>{title}</strong>
-        <span>{description}</span>
+        {description ? <span>{description}</span> : null}
       </span>
       <Icon name="chevron" className="preview-card__chevron" />
     </Link>
