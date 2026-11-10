@@ -243,6 +243,55 @@ Open the existing Notification Settings popup whenever a notification is receive
 - This correction is currently verified in the working tree.
 - It has not yet been deployed after the correction.
 
+## 2026-11-10 — Deploy corrected popup behavior
+
+### Request
+
+Record all work completed for the mobile popup correction and deployment.
+
+### Final correction
+
+- **File changed:** `app/globals.css`
+  - Restored `.ps-overlay` and `.ps-overlay--drawer` to the default mobile bottom-sheet layout.
+  - Kept `.toolbar-popover` as the only mobile popup positioned in the upper-right.
+  - Preserved the onboarding overlay's separate full-screen behavior.
+- **File changed:** `tests/pwa-settings-ui.test.mjs`
+  - Corrected the regression test to assert the intended split:
+    - PWA settings remain bottom sheets on mobile.
+    - Header toolbar popovers use the upper-right position.
+  - Renamed the standard-overlay test to reflect the restored behavior.
+- **File changed:** `AGENT_WORK_LOG.md`
+  - Added this follow-up entry without rewriting earlier history.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `node --test tests/pwa-settings-ui.test.mjs` | 12 passed, 0 failed |
+| `npm test` | Passed |
+| `npm run lint` | 0 errors, 1 existing warning in `RoomContextPanel.tsx` |
+| `npm run typecheck` | Passed |
+| `npm run build` | Passed |
+| `git diff --check` | Passed |
+
+### Git
+
+- Created commit `9b7bcd6`
+- Commit message: `fix: keep PWA settings as mobile sheet`
+- Pushed to `origin/push-delivery-latency`
+- Existing unrelated modified and untracked files were not staged or reverted.
+
+### Deployment
+
+- The first explicit Production deployment for commit `9b7bcd6` was canceled after Vercel also created the matching Git-connected build.
+- The Git-connected deployment completed successfully:
+  - Deployment: `dpl_GeQSesykjy3JaMCwj6ZW36RnKGGS`
+  - Source branch: `push-delivery-latency`
+  - Source commit: `9b7bcd63fb9f94feb7994d13256612f8ac9cc64b`
+  - Status: `READY`
+  - Deployment URL: `https://mapsilip-hi2m38va4-lupalogic-2108s-projects.vercel.app`
+- `https://mapsilip.vercel.app` was assigned to the READY deployment and returned HTTP 200.
+
 ## Future entries
 
 (Add new entries below this line.)
