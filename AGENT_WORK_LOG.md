@@ -351,6 +351,31 @@ Enhance the UI of the popups in tenant view for payment, maintenance, concerns, 
   - Deployment URL: `https://mapsilip-6ahrjmz1h-lupalogic-2108s-projects.vercel.app`
 - Production alias `https://mapsilip.vercel.app` verified live and returned HTTP 200.
 
+---
+
+## 2026-11-10 — Modernize and enlarge typography across all pages
+
+### Request
+Fix font sizing across all pages and surfaces to make them more modern, legible, and easy to read.
+
+### Changes
+- **File changed:** `app/globals.css`
+  - Upgraded global typography scale and set minimum legible floors:
+    - Base body font: Bumped from 15px to 15.5px with 1.6 line height.
+    - Global Shell & Navigation: Desktop sidebar links enlarged from 12px to 14.5px, captions from 9px to 11.5px (750 weight, .08em spacing), topbar search from 12px to 14px, profile text from 11px to 13.5px, mobile nav labels from 10px to 11.5px.
+    - Interactive Controls: Buttons updated from 12px/13px to 14px/14.5px (650 weight), input fields/textareas/selects from 11px-13px to 14px-14.5px (preventing mobile zoom and improving accessibility), labels from 11px-12px to 13px-13.5px.
+    - Cards & Panels: Panel headers updated to 16.5px-17.5px, subheadings from 12px to 13.5px, stat panel titles from 10px to 12px, values 22px-32px, empty state titles to 14.5px-15.5px.
+    - Tables & Lists: Table headers enlarged from 10px-13px to 13.5px (650 weight), cell secondary timestamps/room tags from 10px to 11.5px-12.5px, status badges from 10px-11px to 12px.
+    - Tenant, Management & Caretaker Portals: Tenant overview, details DL lists (dt 12.5px, dd 14px), contract viewers (13px), management payment summary cards (14.5px titles, 12px subtitles), and directory modal details (dt 12px, dd 14px).
+    - Mobile Media Queries (`@media (max-width: 699px)`, `@media (max-width: 559px)`, `@media (max-width: 420px)`): Removed aggressive 8px–10px shrinkages, enforcing a minimum legible floor of 11.5px–12.5px for secondary metadata on mobile.
+
+### Verification
+- `npm test`: 302 passed, 15 skipped, 0 failed.
+- `npm run typecheck`: Passed (0 errors).
+- `npm run lint`: 0 errors, 1 pre-existing warning in `RoomContextPanel.tsx`.
+- `npm run build`: Production build compiled successfully in Turbopack.
+- Playwright verification screenshots captured for Tenant Payments, Management Payments, Tenant Details, and Mobile 390px viewports.
+
 ## Future entries
 
 (Add new entries below this line.)
