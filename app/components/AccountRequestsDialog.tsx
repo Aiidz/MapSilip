@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -76,7 +78,7 @@ export function AccountRequestsDialog({ open }: { open: boolean }) {
     <div className="account-review-dialog__header"><div><small>APPLICATIONS</small><h2 id="account-review-title">Access requests</h2></div><button type="button" className="account-review-dialog__close" onClick={close} aria-label="Close access requests">×</button></div>
     <div className="account-review-dialog__body">
       <aside className="account-review-dialog__list" aria-label="Pending requests"><h3>Awaiting review <span>{requests.length}</span></h3>
-        {loading ? <p role="status">Loading requests…</p> : requests.length ? requests.map(request => <button type="button" key={request.id} className={selected?.id === request.id ? 'is-selected' : ''} onClick={() => { setSelected(request); setMessage(''); setDecision('approved'); }}><span className="account-review-dialog__avatar">{request.display_name?.slice(0,1).toUpperCase() || '?'}</span><span><strong>{request.display_name}</strong><small>{request.email}</small></span></button>) : <p>No access requests are waiting for review.</p>}
+        {loading && !requests.length ? <DataSkeleton label="Loading account requests" /> : requests.length ? requests.map(request => <button type="button" key={request.id} className={selected?.id === request.id ? 'is-selected' : ''} onClick={() => { setSelected(request); setMessage(''); setDecision('approved'); }}><span className="account-review-dialog__avatar">{request.display_name?.slice(0,1).toUpperCase() || '?'}</span><span><strong>{request.display_name}</strong><small>{request.email}</small></span></button>) : <p>No access requests are waiting for review.</p>}
       </aside>
       <section className="account-review-dialog__details" aria-label="Request details">{selected ? <><div className="account-review-dialog__person"><span className="account-review-dialog__avatar">{selected.display_name?.slice(0,1).toUpperCase() || '?'}</span><div><strong>{selected.display_name}</strong><small>Submitted {new Date(selected.created_at).toLocaleDateString()}</small></div></div>
         <dl><div><dt>Email</dt><dd>{selected.email}</dd></div><div><dt>Phone</dt><dd>{selected.phone || 'Not provided'}</dd></div><div><dt>Status</dt><dd>Pending review</dd></div></dl>

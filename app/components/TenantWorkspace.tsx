@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createLatestRequest, fetchOperationRows } from '../lib/workspace-loading';
 import { Icon } from './Icon';
@@ -115,6 +117,7 @@ export function TenantWorkspace({ kind }: { kind: Kind }) {
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
+    setLoading(true);
     try {
       const query = new URLSearchParams({ resource:kind,page:String(page),status:statusFor(kind,filter) });
       const response = await fetch(`/api/operations?${query}`, { signal: request.signal });
@@ -152,7 +155,7 @@ export function TenantWorkspace({ kind }: { kind: Kind }) {
     {kind === 'payments' ? <div className="tenant-payment-layout">
       <section className="tenant-payment-history" aria-labelledby="payment-history-title"><h2 id="payment-history-title">Payment History</h2>
         <div className="tenant-filter-row" role="group" aria-label="Payment history filters">{item.filters.map(value => <button key={value} type="button" className={`tenant-filter${filter === value ? ' is-active' : ''}`} aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(1); setSelected(null); }}>{value}</button>)}</div>
-        {loading ? <p role="status">Loading payments…</p> : rows.length ? <div className="tenant-payment-history__items">{rows.map(row => { const billed = invoices.find(item => item.id === row.invoice_id); return <button type="button" className={`tenant-payment-history__item${selected?.id === row.id ? ' is-selected' : ''}`} key={String(row.id)} onClick={() => setSelected(row)}><span><strong>{billed ? paymentMonth(billed.coverage_start) : `Submitted ${paymentDate(row.created_at)}`}</strong><small>{paymentAmount(row.amount,billed?.currency)}</small></span><span className={`tenant-payment-status tenant-payment-status--${String(row.status)}`}>{paymentStatus(row.status)}</span></button>; })}</div> : <EmptyState title="No payments to display" description="Your payment submissions will appear here." icon="receipt" />}
+        {loading && !rows.length ? <DataSkeleton label="Loading payment history" /> : rows.length ? <div className="tenant-payment-history__items">{rows.map(row => { const billed = invoices.find(item => item.id === row.invoice_id); return <button type="button" className={`tenant-payment-history__item${selected?.id === row.id ? ' is-selected' : ''}`} key={String(row.id)} onClick={() => setSelected(row)}><span><strong>{billed ? paymentMonth(billed.coverage_start) : `Submitted ${paymentDate(row.created_at)}`}</strong><small>{paymentAmount(row.amount,billed?.currency)}</small></span><span className={`tenant-payment-status tenant-payment-status--${String(row.status)}`}>{paymentStatus(row.status)}</span></button>; })}</div> : <EmptyState title="No payments to display" description="Your payment submissions will appear here." icon="receipt" />}
         {count > 25 && <div className="operational-pagination"><button type="button" disabled={page===1} onClick={() => setPage(page-1)}>Previous</button><span>{page} / {Math.ceil(count/25)}</span><button type="button" disabled={page*25>=count} onClick={() => setPage(page+1)}>Next</button></div>}
       </section>
       <section className="tenant-payment-details" aria-labelledby="payment-details-title"><h2 id="payment-details-title">Payment Details</h2>{selected ? <div className="tenant-payment-details__body"><button type="button" className="tenant-payment-details__close" onClick={() => setSelected(null)} aria-label="Close payment details">×</button><h3>Payment Information</h3><dl>
@@ -163,7 +166,7 @@ export function TenantWorkspace({ kind }: { kind: Kind }) {
       <Panel title={item.section} description="Updates about your submissions." icon={kind === 'maintenance' ? 'wrench' : 'sparkles'}>
         <div className="tenant-filter-row" role="group" aria-label={`${item.section} filters`}>{item.filters.map(value => <button key={value} type="button" className={`tenant-filter${filter === value ? ' is-active' : ''}`} aria-pressed={filter === value}
           onClick={() => { setFilter(value); setPage(1); setSelected(null); }}>{value}</button>)}</div>
-        {loading ? <p role="status">Loading records…</p> : rows.length ? <div className="tenant-record-items">{rows.map(row => <button type="button" key={String(row.id)} className={`tenant-record-item${selected?.id === row.id ? ' is-selected' : ''}`} onClick={() => setSelected(row)}>
+        {loading && !rows.length ? <DataSkeleton /> : rows.length ? <div className="tenant-record-items">{rows.map(row => <button type="button" key={String(row.id)} className={`tenant-record-item${selected?.id === row.id ? ' is-selected' : ''}`} onClick={() => setSelected(row)}>
           <strong>{pretty(row.category)}</strong>
           <span>{new Date(String(row.created_at)).toLocaleDateString()}</span><small>{pretty(row.status)}</small>
         </button>)}</div> : <EmptyState title="No records to display" description="Your submissions will appear here when available." icon={kind === 'maintenance' ? 'wrench' : 'sparkles'} />}
@@ -184,12 +187,15 @@ export function TenantNotifications() {
   const [rows,setRows] = useState<Row[]>([]);
   const [query,setQuery] = useState('');
   const [error,setError] = useState('');
+  const [loading,setLoading] = useState(true);
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
+    setLoading(true);
     try { const response = await fetch(`/api/operations?resource=notifications&search=${encodeURIComponent(query)}`, { signal: request.signal });
       if (!response.ok) throw new Error(); const result = await response.json(); if (!request.isCurrent()) return; setRows(result.rows); setError(''); }
     catch { if (!request.isCurrent()) return; setError('Notifications could not be loaded.'); }
+    finally { if (request.isCurrent()) setLoading(false); }
   },[query]);
   useEffect(() => { const activeRequests = requests.current; const timer = window.setTimeout(() => void load(),150); return () => { window.clearTimeout(timer); activeRequests.cancel(); }; },[load]);
   async function markRead(id: string) {
@@ -199,7 +205,7 @@ export function TenantNotifications() {
   return <div className="tenant-workspace"><PageHeader title="Notifications" description="Updates related to your account and stay." />
     <Panel title="Recent Notifications" description="Your latest account updates." icon="bell"><div className="tenant-notification-tools"><label className="tenant-search"><Icon name="search" /><span className="sr-only">Search notifications</span><input type="search" placeholder="Search notifications" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
       {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
-      {rows.length ? <div className="tenant-notification-list">{rows.map(row => <article key={String(row.id)}><a href={String(row.href)}><strong>{pretty(row.title)}</strong><p>{pretty(row.body)}</p></a>{!row.read_at && <button type="button" onClick={() => void markRead(String(row.id))}>Mark read</button>}</article>)}</div>
+      {loading && !rows.length ? <DataSkeleton label="Loading notifications" /> : rows.length ? <div className="tenant-notification-list">{rows.map(row => <article key={String(row.id)}><a href={String(row.href)}><strong>{pretty(row.title)}</strong><p>{pretty(row.body)}</p></a>{!row.read_at && <button type="button" onClick={() => void markRead(String(row.id))}>Mark read</button>}</article>)}</div>
         : <EmptyState title="No notifications to display" description="New account updates will appear here." icon="bell" />}
     </Panel>
   </div>;

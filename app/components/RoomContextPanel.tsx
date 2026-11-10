@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Icon } from './Icon';
 import type { RoomContext, RoomMaintenance, RoomResident } from '../lib/room-context.mjs';
@@ -95,7 +97,7 @@ export function RoomContextPanel({ roomId, role, onChanged, presentation = 'acti
     finally { setBusy(false); }
   }
 
-  if (loading && !context) return <p role="status">Loading room details…</p>;
+  if (loading && !context) return <DataSkeleton label="Loading room details" variant="details" />;
   if (error && !context) return <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>;
   if (!context) return null;
   const viewerRole = context.viewer_role;

@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createLatestRequest, fetchOperationRows } from '../lib/workspace-loading';
 import { Icon } from './Icon';
@@ -34,17 +36,33 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
+    setLoading(true);
     try {
       const query = new URLSearchParams({ resource:'payments',page:String(page),search,status,month });
-      const [result, dashboard] = await Promise.all([fetch(`/api/operations?${query}`, { signal: request.signal }),fetch('/api/dashboard', { signal: request.signal })]);
-      if (!result.ok || !dashboard.ok) throw new Error();
-      const [list, metrics] = await Promise.all([result.json(),dashboard.json()]);
+      const result = await fetch(`/api/operations?${query}`, { signal: request.signal });
+      if (!result.ok) throw new Error();
+      const list = await result.json();
       if (!request.isCurrent()) return;
-      setRows(list.rows); setCount(list.count); setSummary(metrics); setMessage('');
+      setRows(list.rows); setCount(list.count); setMessage('');
     } catch { if (!request.isCurrent()) return; setMessage('Payment records could not be loaded.'); }
     finally { if (request.isCurrent()) setLoading(false); }
   },[page,search,status,month]);
   useEffect(() => { const activeRequests = requests.current; const timer = window.setTimeout(() => void load(),150); return () => { window.clearTimeout(timer); activeRequests.cancel(); }; },[load]);
+  const summaryRequests = useRef(createLatestRequest());
+  const loadSummary = useCallback(async () => {
+    const request = summaryRequests.current.start();
+    try {
+      const response = await fetch('/api/dashboard', { signal: request.signal });
+      if (!response.ok) throw new Error();
+      const metrics = await response.json();
+      if (request.isCurrent()) setSummary(metrics);
+    } catch { if (request.isCurrent()) setMessage('Payment summary could not be loaded. Refresh to retry.'); }
+  }, []);
+  useEffect(() => {
+    const activeRequests = summaryRequests.current;
+    void loadSummary();
+    return () => activeRequests.cancel();
+  }, [loadSummary]);
   useEffect(() => {
     const controller = new AbortController();
     Promise.all(['tenants','rooms','assignments','invoices'].map(resource => fetchOperationRows(resource, controller.signal)))
@@ -74,7 +92,7 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
     const form = new FormData(event.currentTarget);
     setBusy(true);
     try { await mutate('payment.review',{ id:selected.id,status:(event.nativeEvent as SubmitEvent).submitter instanceof HTMLButtonElement ? ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement).value : form.get('status'),note:form.get('note') });
-      setSelected(null); setMessage('Payment review saved.'); await load(); }
+      setSelected(null); setMessage('Payment review saved.'); await Promise.all([load(), loadSummary()]); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Review failed.'); }
     finally { setBusy(false); }
   }
@@ -84,7 +102,7 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
     const fields = Object.fromEntries(new FormData(form).entries());
     setBusy(true);
     try { await mutate('invoice.create',{ ...fields,currency:String(fields.currency).trim().toUpperCase() });
-      form.reset(); setCreating(false); setMessage('Invoice created.'); await load(); }
+      form.reset(); setCreating(false); setMessage('Invoice created.'); await Promise.all([load(), loadSummary()]); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Invoice could not be created.'); }
     finally { setBusy(false); }
   }
@@ -102,14 +120,14 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
     ].map(([title,value,description],index) => <article className={`payment-summary__card${index === 0 ? ' payment-summary__card--highlight' : ''}`} key={title}>
       <span>{title}</span><strong>{value}</strong><small>{description}</small><span className="payment-summary__mark" aria-hidden="true"><Icon name="arrow" /></span>
     </article>)}</section>
-    {message && <p role="status">{message} <button type="button" onClick={() => void load()}>Refresh</button></p>}
+    {message && <p role="status">{message} <button type="button" onClick={() => void Promise.all([load(), loadSummary()])}>Refresh</button></p>}
     <div className="payment-board"><div className="payment-list-column"><div className="payment-filters" aria-label="Payment record filters">
       <label className="payment-filter payment-filter--search"><Icon name="search" /><input aria-label="Search payment reference or tenant name" placeholder="Search reference or tenant name..." value={search} onChange={event => { setSearch(event.target.value);setPage(1); }} /></label>
       <PaymentDropdown label="Submission month" icon="calendar" value={month} onChange={value => { setMonth(value); setPage(1); }} options={[{ value:'',label:'All Months' }, ...Array.from({ length:12 },(_,index) => { const date = new Date(`${currentMonth}-01T00:00:00Z`); date.setUTCMonth(date.getUTCMonth()-index); return { value:date.toISOString().slice(0,7),label:date.toLocaleString(undefined,{ month:'long',year:'numeric',timeZone:'UTC' }) }; })]} />
       <PaymentDropdown label="Payment status" icon="filter" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value:'',label:'All Statuses' },{ value:'pending',label:'For Review' },{ value:'approved',label:'Verified' },{ value:'rejected',label:'Rejected' }]} />
     </div>
       <section className="payment-table-panel" aria-label="Payment submissions"><div className="payment-table-scroll"><table className="payment-table"><thead><tr><th scope="col">Tenant / Room</th><th scope="col">Amount</th><th scope="col">Submitted</th><th scope="col">Status</th></tr></thead>
-        <tbody>{loading ? <tr><td colSpan={4}>Loading payment records…</td></tr> : rows.length ? rows.map(row => <tr key={String(row.id)} onClick={() => { setSelected(row);setCreating(false); }} className={selected?.id === row.id ? 'is-selected' : ''}>
+        <tbody>{loading && !rows.length ? <tr><td colSpan={4}><DataSkeleton label="Loading payment records" variant="table" /></td></tr> : rows.length ? rows.map(row => <tr key={String(row.id)} onClick={() => { setSelected(row);setCreating(false); }} className={selected?.id === row.id ? 'is-selected' : ''}>
           <td><button type="button" className="payment-row-select" onClick={() => { setSelected(row);setCreating(false); }}><span className="payment-tenant-avatar" aria-hidden="true">{initials(tenantName(row.tenant_id))}</span><span><strong>{tenantName(row.tenant_id)}</strong><small>Room {roomName(row.tenant_id)}</small></span></button></td>
           <td>{show(row.amount)} {invoiceCurrency(row.invoice_id)}</td><td>{new Date(String(row.created_at)).toLocaleDateString()}<small className="payment-submitted-time">{new Date(String(row.created_at)).toLocaleTimeString(undefined,{ hour:'numeric',minute:'2-digit' })}</small></td><td><span className={`payment-status payment-status--${row.status}`}>{row.status === 'pending' ? 'For Review' : row.status === 'approved' ? 'Verified' : 'Rejected'}</span></td>
         </tr>) : <tr><td colSpan={4}><div className="payment-empty"><span className="payment-empty__icon"><Icon name="fileSearch" /></span><strong>No payment submissions to display</strong><p>Payment records will appear here when available.</p></div></td></tr>}</tbody>

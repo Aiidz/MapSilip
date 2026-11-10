@@ -1,7 +1,10 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createLatestRequest } from '../lib/workspace-loading';
 import { Icon } from './Icon';
 import { EmptyState, PageHeader } from './ui';
 import dynamic from 'next/dynamic';
@@ -19,37 +22,48 @@ export function DashboardOverview({ role, showAccessRequests = false }: { role: 
   const [recent, setRecent] = useState<Row[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
+    const request = requests.current.start();
+    const get = (url: string) => fetch(url, { signal: request.signal });
     try {
       const resource = role === 'tenant' ? 'notifications' : 'maintenance';
       const roomCountPromise = role === 'owner'
-        ? fetch('/api/operations?resource=rooms&page=1&pageSize=1')
+        ? get('/api/operations?resource=rooms&page=1&pageSize=1')
           .then(async response => response.ok ? response.json() : null).catch(() => null)
         : Promise.resolve(null);
       const roomLabelsPromise = role === 'caretaker'
-        ? fetch('/api/operations?resource=rooms&page=1&pageSize=100')
+        ? get('/api/operations?resource=rooms&page=1&pageSize=100')
           .then(async response => response.ok ? response.json() : null).catch(() => null)
         : Promise.resolve(null);
-      const [summaryResponse, recentResponse, roomSummary, roomLabels, pendingResponse, progressResponse] = await Promise.all([
-        fetch('/api/dashboard'), fetch(`/api/operations?resource=${resource}&page=1&pageSize=8`), roomCountPromise, roomLabelsPromise,
-        role === 'caretaker' ? fetch('/api/operations?resource=maintenance&status=pending&page=1&pageSize=1') : null,
-        role === 'caretaker' ? fetch('/api/operations?resource=maintenance&status=in_progress&page=1&pageSize=1') : null,
+      const [summary, recentResponse, roomSummary, roomLabels, pendingResponse, progressResponse] = await Promise.all([
+        get('/api/dashboard').then(async response => {
+          if (!response.ok) throw new Error();
+          const summary = await response.json();
+          if (request.isCurrent() && role !== 'caretaker') setData({ ...summary });
+          return summary;
+        }), get(`/api/operations?resource=${resource}&page=1&pageSize=8`), roomCountPromise, roomLabelsPromise,
+        role === 'caretaker' ? get('/api/operations?resource=maintenance&status=pending&page=1&pageSize=1') : null,
+        role === 'caretaker' ? get('/api/operations?resource=maintenance&status=in_progress&page=1&pageSize=1') : null,
       ]);
-      if (!summaryResponse.ok || !recentResponse.ok) throw new Error();
-      const [summary, list] = await Promise.all([summaryResponse.json(), recentResponse.json()]);
+      if (!request.isCurrent()) return;
+      if (!recentResponse.ok) throw new Error();
+      const list = await recentResponse.json();
+      if (!request.isCurrent()) return;
       if (role === 'owner') summary.total_rooms = Number.isInteger(roomSummary?.count) ? roomSummary.count : null;
       if (role === 'caretaker') {
         if (!pendingResponse?.ok || !progressResponse?.ok) throw new Error();
         const [pendingList, progressList] = await Promise.all([pendingResponse.json(), progressResponse.json()]);
+        if (!request.isCurrent()) return;
         summary.total_requests = list.count;
         summary.pending_count = pendingList.count;
         summary.in_progress_count = progressList.count;
         if (roomLabels?.rows) setRoomNumbers(Object.fromEntries((roomLabels.rows as Row[]).map(room => [String(room.id), String(room.room_number)])));
       }
       setData(summary); setRecent(list.rows.slice(0,8)); setError('');
-    } catch { setError('Dashboard data could not be loaded.'); }
+    } catch { if (request.isCurrent()) setError('Dashboard data could not be loaded.'); }
   }, [role]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(),0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { const activeRequests = requests.current; const timer = window.setTimeout(() => void load(),0); return () => { window.clearTimeout(timer); activeRequests.cancel(); }; }, [load]);
   const retry = error && <p role="alert" className="dashboard-data-error">{error} <button type="button" onClick={() => void load()}>Retry</button></p>;
   if (role === 'owner') {
     const income = (data?.income_by_currency as { currency: string; amount: number }[] | undefined) ?? [];
@@ -94,7 +108,7 @@ export function DashboardOverview({ role, showAccessRequests = false }: { role: 
               <strong>{new Date(`${day.day}T00:00:00`).toLocaleDateString(undefined,{ weekday:'short' })}</strong>
               <small>{day.count}</small>
             </div>)}</div>
-          </div> : <div className="dashboard-chart__empty"><Icon name="wrench" /><p>{data ? 'No requests in the last seven days.' : 'Loading chart…'}</p></div>}
+          </div> : <div className="dashboard-chart__empty">{data ? <><Icon name="wrench" /><p>No requests in the last seven days.</p></> : <DataSkeleton label="Loading maintenance chart" variant="chart" />}</div>}
         </section>
         <section className="dashboard-panel dashboard-chart" aria-label="Payment Overview"><h2>Payment Overview</h2>
           {total ? <div className="dashboard-payment-chart">
@@ -113,7 +127,7 @@ export function DashboardOverview({ role, showAccessRequests = false }: { role: 
               <span><i className="dashboard-payment-legend__dot dashboard-payment-legend__dot--overdue" aria-hidden="true" />Overdue 0</span>
             </div>
             <p className="dashboard-payment-chart__empty">No invoices to chart.</p>
-          </div> : <div className="dashboard-chart__empty"><Icon name="wallet" /><p>Loading chart…</p></div>}
+          </div> : <DataSkeleton label="Loading payment chart" variant="chart" />}
         </section>
       </div>
       <section className="dashboard-panel dashboard-actions" aria-labelledby="dashboard-actions-title"><div className="dashboard-actions__header">
@@ -122,7 +136,7 @@ export function DashboardOverview({ role, showAccessRequests = false }: { role: 
         <span className={`dashboard-action-list__dot dashboard-action-list__dot--${item.tone}`} aria-hidden="true" />
         <span className="dashboard-action-list__content"><strong>{item.label}</strong><small>{item.count} {item.note}</small></span>
       </Link>)}</div>
-        : <p className="dashboard-actions__empty">{data ? 'Nothing needs attention right now.' : 'Loading action items…'}</p>}
+        : data ? <p className="dashboard-actions__empty">Nothing needs attention right now.</p> : <DataSkeleton label="Loading action items" count={2} />}
       </section>
     </div>;
   }

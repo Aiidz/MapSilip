@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -23,6 +25,7 @@ export function NotificationWorkspace({ area }: { area: Area }) {
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
+    setLoading(true);
     try {
       const params = new URLSearchParams({ resource:'notifications',page:String(page),search:query,category,read });
       const response = await fetch(`/api/operations?${params}`, { signal: request.signal });
@@ -32,6 +35,11 @@ export function NotificationWorkspace({ area }: { area: Area }) {
     finally { if (request.isCurrent()) setLoading(false); }
   },[page,query,category,read]);
   useEffect(() => { const activeRequests = requests.current; const timer=window.setTimeout(() => void load(),150);return () => { window.clearTimeout(timer); activeRequests.cancel(); }; },[load]);
+  useEffect(() => {
+    const updated = () => { void load(); };
+    window.addEventListener('mapsilip-notifications-updated', updated);
+    return () => window.removeEventListener('mapsilip-notifications-updated', updated);
+  }, [load]);
   async function markRead(id:string) {
     const response = await fetch('/api/operations',{ method:'POST',headers:{ 'Content-Type':'application/json' },
       body:JSON.stringify({ action:'notification.read',data:{ id } }) });
@@ -41,7 +49,7 @@ export function NotificationWorkspace({ area }: { area: Area }) {
   const filters = [['unread','Unread'],['read','Read'],['','All']];
   const categories = area === 'caretaker' ? []
     : [['','All categories'],['payments','Payments'],['maintenance','Maintenance'],['concerns','Concerns'],['accounts','Access'],['visits','Visitors']];
-  return <div className="notifications-workspace"><PageHeader title="Notifications" description="Stay informed about important dormitory updates." />
+  return <div className="notifications-workspace"><PageHeader title="Notifications" description="Stay informed about important dormitory updates." action={<button type="button" className="button button--secondary" onClick={() => window.dispatchEvent(new Event('mapsilip-open-app-settings'))}><Icon name="bell" />Settings</button>} />
     <label className="notifications-search"><Icon name="search" /><span className="sr-only">Search notifications</span>
       <input type="search" placeholder="Search notifications..." value={query} onChange={event => { setQuery(event.target.value);setPage(1); }} /></label>
     <div className="notifications-filters" role="group" aria-label="Notification sections">{filters.map(([id,label]) => <button type="button" key={id}
@@ -51,7 +59,7 @@ export function NotificationWorkspace({ area }: { area: Area }) {
       aria-pressed={category===id} className={category===id ? 'is-active' : ''}
       onClick={() => { setCategory(id);setPage(1); }}>{label}</button>)}</div>}
     {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
-    {loading ? <p role="status">Loading notifications…</p> : rows.length ? <div className="notifications-list">{rows.map(row => <article key={row.id} className={row.read_at ? '' : 'is-unread'}>
+    {loading && !rows.length ? <DataSkeleton label="Loading notifications" /> : rows.length ? <div className="notifications-list">{rows.map(row => <article key={row.id} className={row.read_at ? '' : 'is-unread'}>
       <span className="notifications-list__icon"><Icon name={row.event_key.startsWith('maintenance:') ? 'wrench' : row.event_key.startsWith('payment:') || row.event_key.startsWith('invoice:') ? 'wallet' : 'bell'} /></span>
       <div><Link href={row.href} onClick={async event => { if (row.read_at) return; event.preventDefault(); if (await markRead(row.id)) router.push(row.href); }}><strong>{row.title}</strong></Link><p>{row.body}</p></div>
       <div className="notifications-list__meta"><time dateTime={row.created_at}>{new Date(row.created_at).toLocaleString()}</time>

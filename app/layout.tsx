@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
+import { InstallPromptCapture } from "./components/InstallPromptCapture";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -31,7 +32,7 @@ export default function RootLayout(
 ) {
   return (
     <html lang="en">
-      <body className={montserrat.variable}>{children}</body>
+      <body className={montserrat.variable}><InstallPromptCapture />{children}</body>
     </html>
   );
 }

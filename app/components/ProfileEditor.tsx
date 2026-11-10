@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { ProfilePasswordForm } from './ProfilePasswordForm';
 import { useEffect, useState, type FormEvent } from 'react';
 import { PageHeader, Panel } from './ui';
@@ -12,7 +14,8 @@ export function ProfileEditor({ role = 'owner' }: { role?: 'owner' | 'caretaker'
   const [names, setNames] = useState({ first: '', middle: '', last: '' });
   const [draftPhone, setDraftPhone] = useState('');
   const [editing, setEditing] = useState(false);
-  const [message, setMessage] = useState('Loading profile…');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   useEffect(() => { fetch('/api/profile').then(async response => {
     if (!response.ok) throw new Error();
@@ -23,7 +26,7 @@ export function ProfileEditor({ role = 'owner' }: { role?: 'owner' | 'caretaker'
     setDraftPhone(value.phone || '');
     setProfile({ display_name: displayName, phone: value.phone || '',
       emergency_contact: value.emergency_contact || '', email: value.email || '' }); setMessage('');
-  }).catch(() => setMessage('Profile could not be loaded.')); }, []);
+  }).catch(() => setMessage('Profile could not be loaded.')).finally(() => setLoading(false)); }, []);
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (busy) return;
     setBusy(true); setMessage('');
@@ -39,6 +42,7 @@ export function ProfileEditor({ role = 'owner' }: { role?: 'owner' | 'caretaker'
     } catch { setMessage('Profile could not be saved. Check the details and try again.'); }
     finally { setBusy(false); }
   }
+  if (loading) return <div className="tenant-profile-page"><PageHeader title="Profile Settings" description="Manage your account information and security." /><DataSkeleton label="Loading profile" variant="details" count={4} /></div>;
   if (tenant) return <div className="tenant-profile-page tenant-profile-page--resident">
     <PageHeader title="Profile Settings" description="Manage your account information and security." />
     <div className="tenant-profile-grid"><div className="tenant-profile-forms">

@@ -1,5 +1,6 @@
 "use client";
 
+import { DataSkeleton } from "./DataSkeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
@@ -26,6 +27,7 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
   const [signOutError, setSignOutError] = useState(false);
   const [notificationRows, setNotificationRows] = useState<{ id: string; title: string; body: string; href: string; read_at: string | null }[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadLoaded, setUnreadLoaded] = useState(false);
   const unreadRequest = useRef(0);
   const portalReady = useSyncExternalStore(subscribeToClient, getClientSnapshot, getServerSnapshot);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -52,6 +54,7 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
       if (Array.isArray(list.rows)) setNotificationRows(list.rows.filter((row: { read_at: string | null }) => !row.read_at));
       if (Number.isFinite(Number(list.count))) setUnreadCount(Number(list.count));
     } catch { /* Keep the last known unread state until the next refresh. */ }
+    finally { if (requestId === unreadRequest.current) setUnreadLoaded(true); }
   }, [compact]);
 
   useEffect(() => {
@@ -142,7 +145,7 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
         <div><h2 id={notificationsTitleId}>Notifications</h2><p>Your unread updates.</p></div>
         <button className="toolbar-popover__close" type="button" aria-label="Close notifications" onClick={() => { setOpen(null); notificationsTrigger.current?.focus(); }}><span aria-hidden="true">×</span></button>
       </div>
-      {notificationRows.length ? <ul className="toolbar-notification-list">{notificationRows.map(item =>
+      {authEnabled && !unreadLoaded && !notificationRows.length ? <DataSkeleton label="Loading notifications" count={2} /> : notificationRows.length ? <ul className="toolbar-notification-list">{notificationRows.map(item =>
         <li key={item.id}><Link href={item.href} onClick={async event => {
           event.preventDefault();
           const response = await fetch('/api/operations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'notification.read', data: { id: item.id } }) });
@@ -171,7 +174,7 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
       {authEnabled && <button type="button" role="menuitem" onClick={() => {
         setOpen(null); profileTrigger.current?.focus();
         window.dispatchEvent(new Event('mapsilip-open-app-settings'));
-      }}><Icon name="bell" /><span>App and notifications</span><Icon name="chevron" /></button>}
+      }}><Icon name="bell" /><span>Notification settings</span><Icon name="chevron" /></button>}
       <button
         className={authEnabled ? undefined : "toolbar-profile-menu__disabled"}
         type="button"

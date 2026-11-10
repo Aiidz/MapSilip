@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
 import { EmptyState, PageHeader, Panel } from './ui';
@@ -284,7 +286,7 @@ export function OperationalWorkspace({ title, description, resources, role, init
         <button type="submit" className="button button--primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button><button type="button" disabled={busy} onClick={() => setFormAction('')}>Cancel</button>
       </form>}
       </ResponsiveOverlay>
-      {loading ? <p role="status">Loading records…</p> : rows.length === 0 ? <EmptyState title={active === 'tenants' ? 'No tenants found' : 'No records'} description={active === 'tenants' ? 'Try another search or status filter.' : 'Records will appear here when available.'} icon="fileSearch" /> : active === 'tenants' ?
+      {loading && !rows.length ? <DataSkeleton /> : rows.length === 0 ? <EmptyState title={active === 'tenants' ? 'No tenants found' : 'No records'} description={active === 'tenants' ? 'Try another search or status filter.' : 'Records will appear here when available.'} icon="fileSearch" /> : active === 'tenants' ?
         <div className="tenant-directory" aria-label="Tenant cards">{rows.map(row => <button type="button" className="tenant-directory__card" key={String(row.user_id)} onClick={() => openTenant(row)}>
           <span className="tenant-directory__portrait" aria-hidden="true"><span>{String(row.display_name || '?').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span></span>
           <span className="tenant-directory__meta"><strong>{String(row.display_name || 'Unnamed tenant')}</strong><small>{row.room_number ? `Room ${row.room_number}` : 'Needs a room'}</small></span>

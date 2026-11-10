@@ -1,169 +1,143 @@
 # MapSilip
 
-A responsive dormitory management frontend for **Mathea’s Dormitory**, with dedicated workspaces for the owner, caretakers, and tenants. Built with **Next.js, React, and TypeScript**, MapSilip brings room information, payment records, maintenance requests, and resident services into a shared interface.
+**Dormitory management, all in one place.**
 
-**Current status:** Local backend integration milestone. Authentication and operational modules are connected to the existing Supabase project. Credentialed owner, caretaker, and tenant workflows still need manual end-to-end verification before production use.
+MapSilip is a web application for **Mathea’s Dormitory** that connects owners, caretakers, and tenants through dedicated workspaces. It brings room assignments, billing, maintenance, visitor records, and resident communication into one responsive application.
 
 ## Features
 
-- **Management workspace** — data-backed dashboard, room records and assignments, invoices and payment review, tenant access review, maintenance, visitors, notifications, and profile.
-- **Tenant workspace** — home, personal details, payments, maintenance, concerns and suggestions, planned visitors, notifications, and profile screens.
-- **Caretaker workspace** — maintenance dashboard, request list/details layout, notifications, and profile forms, with separate navigation from Management.
-- **Account entry screens** — shared login, owner-reviewed tenant access requests, password reset, and first-login staff password change.
-- **Responsive navigation** — desktop sidebars and mobile navigation, with role-specific destinations.
-- **Light and dark themes** — shared colors, surfaces, controls, and a local theme toggle.
-- **Keyboard-friendly interactions** — profile menus, notification popovers, mobile sheets, Escape dismissal, and focus restoration.
-- **Subtle motion** — short page and popup transitions that respect reduced-motion preferences.
-- **Browser review tooling** — Playwright checks and screenshots at mobile and desktop widths.
+### Management
 
-Records are stored in Supabase. Unsupported exports, room maps, and maintenance heat maps are intentionally deferred. Tenant requests use the password chosen at submission; owner approval and an available room assignment are required before portal access. Password recovery still requires a deliverable email address.
+- View dormitory activity, occupancy, and analytics from the dashboard.
+- Manage rooms, tenant records, and room assignments.
+- Review tenant account requests and approve access with an available room.
+- Create invoices, track balances, and review payment submissions.
+- Coordinate maintenance requests and respond to tenant concerns.
+- Review visitor records and receive notifications.
 
-## Technology
+### Tenants
 
-| Area | Tools |
+- View room information and personal account details.
+- Check invoices and payment records, and submit payment evidence.
+- Submit maintenance requests, concerns, and suggestions.
+- Register planned visitors and follow request updates.
+- Manage profile details and notification preferences.
+
+### Caretakers
+
+- View assigned maintenance work and request details.
+- Update maintenance progress.
+- Receive notifications and manage profile information.
+
+### Across the application
+
+- Role-based sign-in and access controls.
+- Private file uploads backed by Supabase Storage.
+- In-app notifications and configurable Web Push notifications.
+- Installable progressive web app with mobile and desktop layouts.
+- Light and dark themes, keyboard navigation, and reduced-motion support.
+
+## Tech Stack
+
+| Layer | Technology |
 | --- | --- |
-| Application | Next.js 16, App Router |
-| UI | React 19, TypeScript 5, shared CSS |
-| Code quality | ESLint 9, TypeScript typechecking |
-| Tests | Node.js test runner, Playwright |
-| Web assets | Supplied MapSilip logos, web app manifest, and app icons |
+| Framework | Next.js 16 with App Router |
+| Interface | React 19, TypeScript, CSS |
+| Backend | Supabase Auth, PostgreSQL, and Storage |
+| Notifications | Web Push |
+| Hosting | Vercel |
+| Quality checks | ESLint, TypeScript, Node.js test runner, Playwright |
 
-Dependency versions are recorded in `package.json` and `package-lock.json`. The Supabase browser/server clients use the publishable key; the narrow staff security executor remains server-only.
-
-## Project Structure
-
-```text
-MapSilip/
-├── app/
-│   ├── caretaker/          # Caretaker pages and layout
-│   ├── management/         # Management pages and layout
-│   ├── tenant/             # Tenant pages and layout
-│   ├── login/              # Login route
-│   ├── request-account/    # Tenant account-request route
-│   ├── components/         # Shared shells, controls, and workspaces
-│   ├── lib/                # Navigation helpers and illustrative content
-│   ├── globals.css         # Shared styles and theme tokens
-│   ├── layout.tsx          # Root layout and metadata
-│   └── page.tsx            # Default login entry point
-├── public/                 # Runtime logos, manifest, and app icons
-├── scripts/
-│   └── visual-review.mjs   # Playwright interaction checks and screenshots
-├── tests/
-│   └── navigation.test.mjs
-├── docs/                   # Local documentation and references; excluded from Git
-├── AGENTS.md               # Contributor guidelines
-├── eslint.config.mjs
-├── next.config.ts
-├── package.json
-├── package-lock.json
-└── tsconfig.json
-```
-
-## Installation
+## Getting Started
 
 ### Prerequisites
 
-- **Node.js 20.9 or newer** and npm.
-- Access to the private GitHub repository.
-- Playwright Chromium for browser review; it is not required to run the app.
+- Node.js **20.9 or newer** and npm.
+- A configured Supabase project with the repository’s database migrations applied.
+- Access to the application’s environment configuration.
 
-### 1. Clone the repository
+### Installation
 
 ```sh
 git clone https://github.com/Aiidz/MapSilip.git
 cd MapSilip
-```
-
-### 2. Install dependencies
-
-```sh
 npm ci
+cp .env.example .env.local
 ```
 
-The frontend preview does not require environment variables or a database connection. The Supabase client factories are groundwork only and are not used by the portal screens.
+Populate `.env.local` with your environment’s values:
 
-### Optional Supabase foundation
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public Supabase client key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only account provisioning credential |
+| `MAPSILIP_SECURITY_DATABASE_URL` | TLS database connection for the application’s restricted security executor |
+| `MAPSILIP_RATE_LIMIT_HASH_KEY` | Server-only secret for rate-limit hashing |
+| `MAPSILIP_APP_ORIGIN` | Exact application origin, such as `http://localhost:3000` |
+| `MAPSILIP_STAFF_AUTH_ENABLED` | Enable staff authentication for the configured environment |
+| `MAPSILIP_TENANT_AUTH_ENABLED` | Enable tenant authentication for the configured environment |
 
-No Supabase project is connected yet. Project creation and connection require separate authorization. Once an isolated development project is authorized, prepare the local environment:
+Optional Web Push settings are listed in [.env.example](.env.example). Keep server credentials in local environment files or your hosting provider’s secret settings.
 
-1. Copy `.env.example` to `.env.local`.
-2. Set `NEXT_PUBLIC_SUPABASE_URL` to the HTTPS project origin and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to its `sb_publishable_…` key from API settings. Blank values, template placeholders, secret keys and legacy JWT keys are rejected when a factory is called. Never put a secret/service-role key in a `NEXT_PUBLIC_` variable. Validation checks configuration syntax, not connectivity or whether a key belongs to a project.
-3. Run `npm run dev` as usual.
+Database setup, authentication configuration, and hosting instructions are documented in [DEPLOYMENT.md](DEPLOYMENT.md). Review these when configuring a new environment.
 
-The application does not test connectivity during startup, and the current UI does not call Supabase. Missing configuration therefore does not prevent the frontend preview from running. The client utilities report a setup error only if called without valid configuration. No authentication flow, session-refresh proxy, database schema, migration, or live operation is enabled. See the local-only `docs/BACKEND_IMPLEMENTATION_PLAN.md` for the proposed architecture and unresolved decision gates.
-
-The intended production stack is Vercel and hosted Supabase. Docker and a local Supabase stack are not required for development or deployment. Offline foundation tests run without credentials; proving password replacement, session revocation, RLS and private Storage access still requires a separately authorized isolated runtime.
-
-Backend helper boundaries and test conventions are recorded in `app/lib/backend/README.md`. Server clients default to read-only cookies and surface attempted refresh writes. Future Actions/Route Handlers must explicitly request writable cookies, and the eventual Next.js 16 `proxy.ts` must persist refreshed cookies across responses and redirects. No Proxy or authentication guard is activated yet.
-
-### 3. Start the development server
+### Run Locally
 
 ```sh
 npm run dev
 ```
 
-Open the origin configured in `MAPSILIP_APP_ORIGIN` (for example **http://127.0.0.1:3000**). Both `/` and `/login` display the shared login screen; approved tenant access starts at `/request-account`.
+Open [http://localhost:3000](http://localhost:3000). The browser origin must match `MAPSILIP_APP_ORIGIN`.
 
-## Portal Routes
-
-| Portal | Entry route | Main screen areas |
-| --- | --- | --- |
-| Management | `/management` | Dashboard, rooms, tenants, payments, maintenance, visitors, notifications, profile |
-| Tenant | `/tenant` | Home, details, payments, maintenance, concerns, visitors, notifications, profile |
-| Caretaker | `/caretaker` | Dashboard, maintenance, notifications, profile |
-
-Portal routes require a verified Supabase session and role. Database RLS and transactional commands enforce row and mutation permissions independently of navigation.
-
-## Available Commands
-
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the development server |
-| `npm test` | Run Node.js tests (these do not replace credentialed browser checks) |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run the full TypeScript check |
-| `npm run build` | Generate the production build |
-| `npm run start` | Serve an existing production build |
-| `npm run visual:review` | Run Playwright interaction checks and capture screenshots |
-
-For a production build, run `npm run build`, then `npm run start`. Vercel environment and GitHub Actions setup are described in [DEPLOYMENT.md](DEPLOYMENT.md).
-
-Mixed development/build output has caused conflicting generated `.next/dev` and `.next/types` route declarations during typechecking. Use a clean, isolated copy to verify the source when this occurs; preserve the output used by an active server.
-
-## Browser Review
-
-With the app running, install the browser if it is not already available, then run the review:
+### Production Build
 
 ```sh
-npx playwright install chromium
-npm run visual:review
+npm run build
+npm run start
 ```
 
-The script uses **375×812** and **1440×1000** viewports. It checks navigation, selected local controls, themes, popovers, keyboard focus, reduced motion, console errors, and horizontal overflow.
+## Project Structure
 
-- Default app URL: `http://localhost:3000`
-- Default screenshot directory: `/tmp/mapsilip-visual-review`
-- Overrides: `VISUAL_REVIEW_URL` and `VISUAL_REVIEW_DIR`
+```text
+app/
+├── management/       # Owner and management workspace
+├── tenant/           # Tenant workspace
+├── caretaker/        # Caretaker workspace
+├── components/       # Shared UI and workspace components
+├── lib/              # Application logic and backend integrations
+├── auth/             # Authentication callbacks and account flows
+└── globals.css       # Shared styles and theme variables
+public/               # Logos, icons, and PWA assets
+supabase/             # Database migrations and review utilities
+scripts/              # Development and verification tools
+tests/                # Automated tests
+```
 
-Screenshots and generated browser artifacts are kept outside the committed project files.
+## Scripts
 
-## Documentation and Design References
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run build` | Build the application for production |
+| `npm run start` | Serve the production build |
+| `npm run lint` | Check code with ESLint |
+| `npm run typecheck` | Check TypeScript types |
+| `npm test` | Run automated tests |
+| `npm run visual:review` | Run browser checks and capture screenshots |
+| `npm run security:preflight` | Run security configuration checks |
 
-Requirements, UI evidence, and review notes are maintained locally under `docs/`, including:
+## Contributing
 
-- `UI_FEATURE_INVENTORY.md` — screen references and current frontend behavior.
-- `BACKEND_READINESS_AUDIT.md` — integration gaps, decisions, and planning prerequisites.
-- `CLIENT_REQUIREMENTS_QUESTIONS.md` — unresolved product and workflow questions.
-- `PHASE1_ASSUMPTIONS.md` — frontend assumptions and scope boundaries.
-- `reference/MapSilip UI/` and `reference/UI.pdf` — design references.
-- `MapSilip Assets/` — original brand assets.
+Follow [AGENTS.md](AGENTS.md) for repository conventions. Before submitting a change, run:
 
-**The entire `docs/` folder is excluded from Git and GitHub.** Obtain it separately for design or requirements work and maintain a separate backup. A repository clone includes runtime assets in `public/`, but does not restore these local documents or original references.
+```sh
+npm test
+npm run lint
+npm run typecheck
+npm run build
+```
 
-## Development Notes
+For interface changes, also check mobile and desktop layouts, keyboard navigation, dark mode, and reduced motion.
 
-- Authentication, operational records, private evidence uploads, and in-app notifications use the existing Supabase project. New tenant requests use server-side Auth Admin provisioning without a signup confirmation email. Account requests and decisions use in-app notifications and applicant status checks; only password recovery sends email, through Supabase Auth.
-- Billing amounts, currency, six-month coverage, and due dates are entered by the owner because the source documents do not approve automatic pricing rules.
-- `app/lib/preview-data.ts` contains illustrative content; sample values must not become billing, occupancy, or permission rules.
-- Local environment files, credentials, dependencies, build output, and caches are excluded by `.gitignore`. `.env.example` is the placeholder-only template and is safe to commit.
-- Follow [AGENTS.md](AGENTS.md) for repository conventions and verification guidance.
+Design references and internal project documentation are maintained separately in `docs/`, which is excluded from Git and backed up independently.

@@ -36,7 +36,7 @@ async function send(delivery: Delivery, signal: AbortSignal) {
 }
 // 25s overall (including claim), with 2.5s reserved for one fenced release RPC.
 const RPC_MS = 2000;
-export async function dispatchPushBatch({ limit = 20 }: { limit?: number } = {}) {
+export async function dispatchPushBatch({ limit = 100 }: { limit?: number } = {}) {
   const deadline = Date.now() + 25000;
   const workDeadline = deadline - 2500;
   if (!pushAvailable()) throw new BackendError('unavailable');
@@ -50,38 +50,46 @@ export async function dispatchPushBatch({ limit = 20 }: { limit?: number } = {})
     if (result.error) throw new BackendError('unavailable');
     return result.data;
   }
-  const claims = await rpc('mapsilip_push_claim', { p_limit: Math.min(limit, 20) }) as Claim[];
-  const unfinished = new Map(claims.map(claim => [claim.id, { ...claim, sent: false }]));
-  const counts = { claimed: claims.length, accepted: 0, retried: 0, discarded: 0, deferred: 0 };
-  try {
-    // Reserve check2s + provider5s + finish2s before starting a group. All in-flight jobs settle before cleanup.
-    for (let index = 0; index < claims.length && workDeadline - Date.now() >= 9000; index += 4) {
-      await Promise.allSettled(claims.slice(index, index + 4).map(async claim => {
-        const delivery = await rpc('mapsilip_push_delivery_check', { p_id: claim.id, p_token: claim.token }) as Delivery | { deferred: true } | null;
-        if (!delivery) { unfinished.delete(claim.id); counts.discarded++; return; }
-        if ('deferred' in delivery) { unfinished.delete(claim.id); counts.deferred++; return; }
-        if (!recipientAuthEnabled(delivery.role, { staff: isStaffAuthEnabled(), tenant: isTenantAuthEnabled() })) {
-          await rpc('mapsilip_push_finish', { p_id: claim.id, p_token: claim.token, p_outcome: 'discarded', p_status: 0, p_delay: 0 });
-          unfinished.delete(claim.id); counts.discarded++; return;
-        }
-        if (workDeadline - Date.now() < 7000) return;
-        let response = { status: 0, retryAfter: 0 };
-        try { response = await withinBudget(signal => { unfinished.get(claim.id)!.sent = true; return send(delivery, signal); }, Math.min(5000, workDeadline - Date.now() - RPC_MS)); }
-        catch (error) { if (error instanceof BackendError) response.status = 400; }
-        const outcome = deliveryOutcome(response.status, delivery.attempt, response.retryAfter);
-        await rpc('mapsilip_push_finish', { p_id: claim.id, p_token: claim.token, p_outcome: outcome.kind, p_status: response.status, p_delay: outcome.delaySeconds });
-        unfinished.delete(claim.id);
-        if (outcome.kind === 'accepted') counts.accepted++;
-        else if (outcome.kind === 'retry') counts.retried++;
-        else counts.discarded++;
-      }));
+  const totalLimit = Number.isFinite(limit) ? Math.max(1, Math.min(100, Math.floor(limit))) : 100;
+  const counts = { claimed: 0, accepted: 0, retried: 0, discarded: 0, deferred: 0 };
+  // Claim small pages, but drain a burst without waiting for another scheduled invocation.
+  for (let round = 0; round < 10 && counts.claimed < totalLimit && workDeadline - Date.now() >= 11000; round++) {
+    const claims = await rpc('mapsilip_push_claim', { p_limit: Math.min(totalLimit - counts.claimed, 20) }) as Claim[];
+    if (!claims.length) break;
+    counts.claimed += claims.length;
+    const deferredBefore = counts.deferred;
+    const unfinished = new Map(claims.map(claim => [claim.id, { ...claim, sent: false }]));
+    try {
+      // Reserve check2s + provider5s + finish2s before starting a group. All in-flight jobs settle before cleanup.
+      for (let index = 0; index < claims.length && workDeadline - Date.now() >= 9000; index += 4) {
+        await Promise.allSettled(claims.slice(index, index + 4).map(async claim => {
+          const delivery = await rpc('mapsilip_push_delivery_check', { p_id: claim.id, p_token: claim.token }) as Delivery | { deferred: true } | null;
+          if (!delivery) { unfinished.delete(claim.id); counts.discarded++; return; }
+          if ('deferred' in delivery) { unfinished.delete(claim.id); counts.deferred++; return; }
+          if (!recipientAuthEnabled(delivery.role, { staff: isStaffAuthEnabled(), tenant: isTenantAuthEnabled() })) {
+            await rpc('mapsilip_push_finish', { p_id: claim.id, p_token: claim.token, p_outcome: 'discarded', p_status: 0, p_delay: 0 });
+            unfinished.delete(claim.id); counts.discarded++; return;
+          }
+          if (workDeadline - Date.now() < 7000) return;
+          let response = { status: 0, retryAfter: 0 };
+          try { response = await withinBudget(signal => { unfinished.get(claim.id)!.sent = true; return send(delivery, signal); }, Math.min(5000, workDeadline - Date.now() - RPC_MS)); }
+          catch (error) { if (error instanceof BackendError) response.status = 400; }
+          const outcome = deliveryOutcome(response.status, delivery.attempt, response.retryAfter);
+          await rpc('mapsilip_push_finish', { p_id: claim.id, p_token: claim.token, p_outcome: outcome.kind, p_status: response.status, p_delay: outcome.delaySeconds });
+          unfinished.delete(claim.id);
+          if (outcome.kind === 'accepted') counts.accepted++;
+          else if (outcome.kind === 'retry') counts.retried++;
+          else counts.discarded++;
+        }));
+      }
+    } finally {
+      counts.deferred += unfinished.size;
+      if (unfinished.size) {
+        try { await rpc('mapsilip_push_release', { p_claims: [...unfinished.values()] }); }
+        catch { /* A timed-out release remains recoverable through the existing60s lease. */ }
+      }
     }
-  } finally {
-    counts.deferred += unfinished.size;
-    if (unfinished.size) {
-      try { await rpc('mapsilip_push_release', { p_claims: [...unfinished.values()] }); }
-      catch { /* A timed-out release remains recoverable through the existing60s lease. */ }
-    }
+    if (counts.deferred > deferredBefore) break;
   }
   return counts;
 }

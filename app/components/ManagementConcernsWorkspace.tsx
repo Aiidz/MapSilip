@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createLatestRequest } from '../lib/workspace-loading';
 import { Icon } from './Icon';
@@ -20,9 +22,11 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
   const [responding, setResponding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
+    setLoading(true);
     try {
       const query = new URLSearchParams({ resource: 'concerns', page: String(page), pageSize: '25', search, status });
       if (initialTenantId) query.set('tenantId', initialTenantId);
@@ -30,6 +34,7 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
       if (!request.isCurrent()) return;
       setCount(result.count); setRows(result.rows); setSelected(current => result.rows.find((r: Row) => r.id === current?.id) ?? null); setError('');
     } catch { if (!request.isCurrent()) return; setRows([]); setError('Concern records could not be loaded.'); }
+    finally { if (request.isCurrent()) setLoading(false); }
   }, [initialTenantId, search, status, page]);
   useEffect(() => { const activeRequests = requests.current; const timer = window.setTimeout(() => void load(), 120); return () => { window.clearTimeout(timer); activeRequests.cancel(); }; }, [load]);
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -54,7 +59,7 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
           <label className="caretaker-search"><Icon name="search" /><span className="sr-only">Search concerns</span><input placeholder="Search concerns…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} /></label>
         </div>
         {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
-        {rows.length ? <div className="caretaker-recent-list">{rows.map(row => <button type="button" key={String(row.id)} className={`caretaker-request-row${selected?.id === row.id ? ' is-selected' : ''}`} onClick={() => { setSelected(row); setResponding(false); }}>
+        {loading && !rows.length ? <DataSkeleton label="Loading concerns" /> : rows.length ? <div className="caretaker-recent-list">{rows.map(row => <button type="button" key={String(row.id)} className={`caretaker-request-row${selected?.id === row.id ? ' is-selected' : ''}`} onClick={() => { setSelected(row); setResponding(false); }}>
           <span className="caretaker-request-row__top"><strong>{label(row.category) === '—' ? 'Concern' : label(row.category)}</strong><span className={`caretaker-request-row__status caretaker-request-row__status--${label(row.status)}`}>{label(row.status)}</span></span>
           <span className="concern-row-description">{label(row.description)}</span><span className="caretaker-request-row__bottom"><span>Resident submission</span><time>{new Date(String(row.created_at)).toLocaleDateString()}</time></span>
         </button>)}</div> : !error && <EmptyState title="No concerns to display" description={search || status ? 'No concerns match these filters.' : 'Resident submissions will appear here.'} icon="sparkles" />}

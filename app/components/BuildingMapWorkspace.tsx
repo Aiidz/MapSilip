@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSkeleton } from './DataSkeleton';
+
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { DollhouseBuilding } from './DollhouseBuilding';
 import { Icon } from './Icon';
@@ -161,7 +163,7 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
     {message && <p role="status" className="building-experience__notice">{message}</p>}
     <div className="building-experience__layout">
       <div className="building-experience__stage">
-        {loading || recordsLoading ? <div className="building-experience__stage-message" role="status">Loading building records…</div> : <>
+        {loading || recordsLoading ? <DataSkeleton label="Loading building records" variant="chart" /> : <>
           <DollhouseBuilding floors={displayFloors} selectedFloor={selectedFloor} visibleRooms={visibleRooms} issues={issueMap}
             selectedRoomId={selectedRoomId} selectedSlotIndex={selectedSlotIndex} heatmap={heatmap} zoom={zoom} pan={pan}
             roofVisible={true} occupancy={occupancy} onSelectFloor={chooseFloor} onSelectRoom={chooseRoom} onSelectRoomSpace={chooseRoomSpace}

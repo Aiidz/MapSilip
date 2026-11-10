@@ -40,7 +40,7 @@ try {
   client = new pg.Client({ connectionString: url }); await client.connect();
   if ((await client.query('select enabled from mapsilip_private.push_runtime')).rows.some(row => row.enabled)) throw Error('Tests changed the actual runtime gate.');
   await client.query(await readFile('supabase/migrations/20261106081010_push_device_controls.sql', 'utf8'));
-  const deviceChild = spawn(process.execPath, ['--test', 'tests/push-device-database.test.mjs'], {
+  const deviceChild = spawn(process.execPath, ['--test', '--test-concurrency=1', 'tests/push-device-database.test.mjs', 'tests/push-wake-database.test.mjs', 'tests/foreground-database.test.mjs'], {
     env: { ...process.env, MAPSILIP_PUSH_TEST_DATABASE_URL: url }, stdio: 'inherit',
   });
   const deviceExit = await new Promise((done, reject) => { deviceChild.on('error', reject); deviceChild.on('exit', done); });
