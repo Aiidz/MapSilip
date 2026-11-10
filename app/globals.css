@@ -3622,11 +3622,11 @@ button.room-context__person:hover, button.room-context__person:focus-visible { b
 @media (max-width: 999px) {
   .toolbar-popover {
     position: fixed;
-    inset: auto 12px calc(86px + env(safe-area-inset-bottom));
-    width: auto;
+    inset: 78px 12px auto auto;
+    width: min(390px, calc(100vw - 24px));
     max-height: min(62dvh, 460px);
-    transform: translateY(10px) scale(.99);
-    transform-origin: bottom center;
+    transform: translateY(-8px) scale(.99);
+    transform-origin: top right;
   }
   .toolbar-popover.is-open { transform: translateY(0) scale(1); }
   .toolbar-profile-menu { width: auto; }
