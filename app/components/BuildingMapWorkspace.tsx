@@ -53,7 +53,7 @@ function svgPointFromClient(svg: SVGSVGElement, x: number, y: number) {
   }
 }
 
-export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, onViewRequests, roomRecords, assignmentRecords, recordsLoading = false, onRecordsChanged }: {
+export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, onViewRequests, roomRecords, assignmentRecords, recordsLoading = false, onRecordsChanged, initialSelectedRoomId }: {
   role: Role;
   onViewRequests?: () => void;
   mode?: 'rooms' | 'maintenance';
@@ -62,6 +62,7 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
   assignmentRecords?: Assignment[];
   recordsLoading?: boolean;
   onRecordsChanged?: () => Promise<void>;
+  initialSelectedRoomId?: string | null;
 }) {
   const [loadedRooms, setRooms] = useState<BuildingRoom[]>([]);
   const [issues, setIssues] = useState<BuildingIssue[]>([]);
@@ -75,6 +76,7 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
   const [message, setMessage] = useState('');
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const appliedInitialRoomId = useRef<string | null>(null);
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -98,11 +100,22 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
       setRooms(roomRows);
       setIssues(issueRows);
       setAssignments(assignmentRows);
+      if (initialSelectedRoomId && appliedInitialRoomId.current !== initialSelectedRoomId) {
+        const selectedRoom = roomRows.find(room => room.id === initialSelectedRoomId);
+        if (selectedRoom) {
+          appliedInitialRoomId.current = initialSelectedRoomId;
+          setSelectedFloor(selectedRoom.floor_label);
+          setSelectedRoomId(selectedRoom.id);
+          setSelectedSlotIndex(null);
+          setPan({ x: 0, y: 0 });
+          setZoom(1);
+        }
+      }
       setError('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Building data could not be loaded.');
     } finally { setLoading(false); }
-  }, [role, hasRoomRecords, hasAssignmentRecords]);
+  }, [role, hasRoomRecords, hasAssignmentRecords, initialSelectedRoomId]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
   const floors = useMemo(() => groupRoomsByFloor(rooms), [rooms]);

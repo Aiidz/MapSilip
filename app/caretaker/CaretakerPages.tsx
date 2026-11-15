@@ -2,7 +2,7 @@
 
 import { CloseIcon } from "../components/CloseIcon";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { MobileDetailSurface } from "../components/MobileDetailSurface";
 import { ResponsiveOverlay } from "../components/ResponsiveOverlay";
@@ -30,7 +30,7 @@ export function CaretakerDashboard() {
   </div>;
 }
 
-export function CaretakerMaintenance() {
+export function CaretakerMaintenance({ initialRoomId }: { initialRoomId?: string }) {
   const [view, setView] = useState<'building' | 'list'>('building');
   const [query, setQuery] = useState("");
   const [roomFilter, setRoomFilter] = useState('');
@@ -45,6 +45,11 @@ export function CaretakerMaintenance() {
   const [roomFloors,setRoomFloors] = useState<Map<string,string>>(new Map());
   const [selected,setSelected] = useState<Record<string,unknown> | null>(null);
   const [responding,setResponding] = useState(false);
+  const isMobile = useSyncExternalStore(
+    callback => { const media = window.matchMedia('(max-width: 767px)'); media.addEventListener('change', callback); return () => media.removeEventListener('change', callback); },
+    () => window.matchMedia('(max-width: 767px)').matches,
+    () => false,
+  );
   const [error,setError] = useState('');
   const [busy,setBusy] = useState(false);
   useEffect(() => {
@@ -106,12 +111,13 @@ export function CaretakerMaintenance() {
     setBusy(true);
     try { const response = await fetch('/api/operations',{ method:'POST',headers:{ 'Content-Type':'application/json' },
       body:JSON.stringify({ action:'maintenance.update',data:{ id:selected.id,status:fields.get('status'),response:fields.get('response') } }) });
-      if (!response.ok) throw new Error(); form.reset(); setSelected(null);setResponding(false);await load();setSummaryVersion(version => version+1); }
+      if (!response.ok) throw new Error(); form.reset(); setResponding(false);setSelected(null);await load();setSummaryVersion(version => version+1); }
     catch { setError('The maintenance update could not be saved.'); }
     finally { setBusy(false); }
   }
   return <div className="caretaker-workspace maintenance-workspace">
-    <PageHeader title="Maintenance Heatmap" description="Monitor room maintenance activity and repair requests." />
+    <PageHeader title="Maintenance Heatmap" description="Monitor room maintenance activity and repair requests."
+      action={<button className="dashboard-export room-management__export" type="button" disabled><Icon name="download" />Export Report</button>} />
     <section className="caretaker-summary caretaker-list-summary" aria-label="Maintenance request summary">
       {([['Total Requests',count,'Recorded repairs'],['Pending',statusCounts?.pending,'Awaiting action'],['In Progress',statusCounts?.in_progress,'Being handled'],['Urgent Requests',null,'Priority not tracked']] as const).map(([label,value,description]) => <article className="caretaker-summary__card" key={label}>
         <div><h2>{label}</h2><span>{value ?? '—'}</span><p>{description}</p></div><span className="caretaker-summary__icon" aria-hidden="true"><Icon name="arrow" /></span>
@@ -121,7 +127,7 @@ export function CaretakerMaintenance() {
       <button type="button" className={view === 'building' ? 'is-active' : ''} aria-pressed={view === 'building'} onClick={() => setView('building')}><Icon name="building" />2D Heatmap</button>
       <button type="button" className={view === 'list' ? 'is-active' : ''} aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name="wrench" />Maintenance List</button>
     </div>
-    {view === 'building' ? <BuildingMapWorkspace role="caretaker" mode="maintenance" onViewRequests={() => setView('list')} /> : <>
+    {view === 'building' ? <BuildingMapWorkspace role="caretaker" mode="maintenance" initialSelectedRoomId={initialRoomId} onViewRequests={() => setView('list')} /> : <>
     <div className="caretaker-maintenance-layout">
       <div className="caretaker-request-list">
         <div className="caretaker-room-tools">
@@ -148,6 +154,13 @@ export function CaretakerMaintenance() {
         {selected ? <div className="caretaker-selected-details">
           <>
             <button type="button" className="caretaker-details-close" aria-label="Close maintenance details" onClick={() => setSelected(null)}><CloseIcon /></button>
+            {responding && isMobile ? <form className="operational-form caretaker-response-form caretaker-response-form--inline" onSubmit={update}>
+              <h3>Update request</h3>
+              <label>Note<textarea name="response" maxLength={2000} rows={3} placeholder="Add repair notes or progress updates…" /></label>
+              <label>Update status<select name="status" defaultValue={selected.status==='pending'?'in_progress':'resolved'}>
+                {selected.status==='pending' ? <option value="in_progress">In Progress</option> : <option value="resolved">Resolved</option>}</select></label>
+              <div><button className="button button--primary" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button><button type="button" className="button button--secondary" disabled={busy} onClick={() => setResponding(false)}>Cancel</button></div>
+            </form> : <>
             <h3>Request Information</h3>
             <div className="caretaker-details-grid">
               <p><small>Repair Category</small><strong>{String(selected.category)}</strong></p>
@@ -164,17 +177,13 @@ export function CaretakerMaintenance() {
               <div><b>Request created</b><time dateTime={String(selected.created_at)}>{new Date(String(selected.created_at)).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}</time></div>
             </div>
             {selected.status !== 'resolved' && <button type="button" className="button button--secondary" onClick={() => setResponding(true)}>Respond</button>}
+            </>}
           </>
         </div> : <EmptyState title="No request selected" description="Select a maintenance request to view its details." icon="fileSearch" />}
       </Panel></MobileDetailSurface>
     </div>
-    <ResponsiveOverlay
-      open={responding && Boolean(selected)}
-      onClose={() => setResponding(false)}
-      title="Update maintenance request"
-      description={selected ? `${String(selected.category)} · ${roomNumbers.get(String(selected.room_id)) ? `Room ${roomNumbers.get(String(selected.room_id))}` : 'Room —'}` : undefined}
-      variant="dialog"
-    >
+    <ResponsiveOverlay open={responding && Boolean(selected) && !isMobile} onClose={() => setResponding(false)} title="Update maintenance request"
+      description={selected ? `${String(selected.category)} · ${roomNumbers.get(String(selected.room_id)) ? `Room ${roomNumbers.get(String(selected.room_id))}` : 'Room —'}` : undefined} variant="dialog">
       {selected && <form key={String(selected.id)} className="operational-form caretaker-response-form" onSubmit={update}>
         <label>Note<textarea name="response" maxLength={2000} rows={3} placeholder="Add repair notes or progress updates…" /></label>
         <label>Update status<select name="status" defaultValue={selected.status==='pending'?'in_progress':'resolved'}>

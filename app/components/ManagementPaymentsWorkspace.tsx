@@ -127,7 +127,7 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
       <span>{title}</span><strong>{value}</strong><small>{description}</small><span className="payment-summary__mark" aria-hidden="true"><Icon name="arrow" /></span>
     </article>)}</section>
     {message && <p role="status">{message} <button type="button" onClick={() => void Promise.all([load(), loadSummary()])}>Refresh</button></p>}
-    <div className="payment-board"><div className="payment-list-column"><div className="payment-filters" aria-label="Payment record filters">
+    <div className={`payment-board${selected ? ' payment-board--details-open' : ''}`}><div className="payment-list-column"><div className="payment-filters" aria-label="Payment record filters">
       <label className="payment-filter payment-filter--search"><Icon name="search" /><input aria-label="Search payment reference or tenant name" placeholder="Search reference or tenant name..." value={search} onChange={event => { setSearch(event.target.value);setPage(1); }} /></label>
       <PaymentDropdown label="Submission month" icon="calendar" value={month} onChange={value => { setMonth(value); setPage(1); }} options={[{ value:'',label:'All Months' }, ...Array.from({ length:12 },(_,index) => { const date = new Date(`${currentMonth}-01T00:00:00Z`); date.setUTCMonth(date.getUTCMonth()-index); return { value:date.toISOString().slice(0,7),label:date.toLocaleString(undefined,{ month:'long',year:'numeric',timeZone:'UTC' }) }; })]} />
       <PaymentDropdown label="Payment status" icon="filter" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value:'',label:'All Statuses' },{ value:'pending',label:'For Review' },{ value:'approved',label:'Verified' },{ value:'rejected',label:'Rejected' }]} />
@@ -140,8 +140,8 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
       </table></div>{count > 25 && <div className="operational-pagination"><button type="button" disabled={page===1} onClick={() => setPage(page-1)}>Previous</button><span>{page} / {Math.ceil(count/25)}</span><button type="button" disabled={page*25>=count} onClick={() => setPage(page+1)}>Next</button></div>}</section>
     </div>
     <MobileDetailSurface open={Boolean(selected)} onClose={() => setSelected(null)} title="Payment Details">
-    <section className="payment-details-panel" aria-labelledby="payment-details-title"><h2 id="payment-details-title">Payment Details</h2>
-      {selected ? <div className="payment-selected-details">
+    {selected && <section className="payment-details-panel payment-details-panel--selected" aria-labelledby="payment-details-title"><h2 id="payment-details-title">Payment Details</h2>
+      <div className="payment-selected-details">
         <button className="payment-detail-close" type="button" aria-label="Close payment details" onClick={() => setSelected(null)}><CloseIcon /></button>
         <div className="payment-detail-identity"><ProfilePhoto key={String(selected.tenant_id)} className="payment-tenant-avatar" userId={String(selected.tenant_id)} fallback={initials(tenantName(selected.tenant_id))} /><div><strong>{tenantName(selected.tenant_id)}</strong><small>Room {roomName(selected.tenant_id)}</small></div><span className={`payment-status payment-status--${selected.status}`}>{statusLabel(selected.status)}</span></div>
         <h3>Payment Information</h3><dl className="payment-information">
@@ -157,8 +157,8 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
           <label>Reason if rejected<textarea name="note" rows={3} maxLength={500} /></label>
           <div className="payment-review-actions"><button className="button payment-review-reject" name="status" value="rejected" disabled={busy}>Reject</button><button className="button payment-review-confirm" name="status" value="approved" disabled={busy}>Confirm Payment</button></div>
         </form> : <div className={`payment-review-result payment-review-result--${selected.status}`}><strong>{selected.status === 'approved' ? '✓ Payment Verified' : 'ⓘ Payment Rejected'}</strong><p>{selected.status === 'approved' ? 'This payment has been confirmed by the admin.' : 'Please contact the admin regarding your payment submission.'}</p>{Boolean(selected.review_note) && <p>{show(selected.review_note)}</p>}</div>}
-      </div> : <div className="payment-details-empty"><span className="payment-details-empty__icon"><Icon name="fileSearch" /></span><strong>No Payment Selected</strong><p>Select a payment record to view details and review payment proof.</p></div>}
-    </section>
+      </div>
+    </section>}
     </MobileDetailSurface>
     <ResponsiveOverlay
       open={creating}

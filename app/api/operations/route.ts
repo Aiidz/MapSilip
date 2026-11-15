@@ -120,6 +120,7 @@ export async function GET(request: NextRequest) {
     } else if (search && spec.search) query = query.ilike(spec.search, `%${search}%`);
     if (status) query = query.eq('status', status);
     if (category === 'payments') query = query.or('event_key.like.payment:%,event_key.like.invoice:%');
+    else if (category === 'accounts') query = query.or('event_key.like.account-request:%,event_key.like.assignment:%,event_key.like.room-prep:%');
     else if (category) query = query.like('event_key', `${prefixes[category]}%`);
     if (read === 'unread') query = query.is('read_at',null);
     if (read === 'read') query = query.not('read_at','is',null);
@@ -145,7 +146,7 @@ export async function GET(request: NextRequest) {
 }
 
 const allowedActions = new Set([
-  'notification.read','profile.update','attachment.begin','room.create','room.update','room.assign',
+  'notification.read','notification.unread','profile.update','attachment.begin','room.create','room.update','room.assign',
   'invoice.create','payment.submit','payment.review','maintenance.create','maintenance.update',
   'concern.create','concern.respond','visit.create','visit.cancel',
 ]);
@@ -159,7 +160,9 @@ export async function POST(request: NextRequest) {
         !body.data || typeof body.data !== 'object' || Array.isArray(body.data)) throw new BackendError('invalid_input');
     const client = await createSupabaseServerClient();
     await verifyAuthSession(client.auth);
-    const { data, error } = body.action === 'visit.create'
+    const { data, error } = body.action === 'notification.unread'
+      ? await client.rpc('mapsilip_mark_notification_unread', { p_id: body.data.id })
+      : body.action === 'visit.create'
       ? await client.rpc('mapsilip_create_visit', { p_data: body.data })
       : body.action === 'concern.create'
         ? await client.rpc('mapsilip_create_concern', { p_data: body.data })

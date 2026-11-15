@@ -32,14 +32,12 @@ export function PwaOnboarding({ open, onClose, onInstall, ios, nativeInstall, st
         <div className="setup-composition" key={mode}>
           <OnboardingArtwork scene={profile ? 4 : notifications ? 2 : 3} priority />
           <div className="setup-copy">
-            <ol className="setup-progress" aria-label="Account setup">
-              {(['profile', 'invite', 'notifications'] as const).map((step, index) => <li key={step} aria-current={step === mode ? 'step' : undefined}><span aria-hidden="true">{index + 1}</span>{['Photo', 'Install', 'Notifications'][index]}</li>)}
-            </ol>
             <h1 ref={heading} tabIndex={-1}>{title}</h1>
             <p className="setup-description">{profile ? 'Add a photo so everyone can recognize you.' : notifications ? 'Receive important dormitory announcements, updates, and notifications.' : 'Install MapSilip for convenient access directly from your home screen.'}</p>
+            <div className="setup-actions">
             {profile ? <div className="setup-profile" aria-busy={photoBusy}>
               <div className="setup-profile__identity">
-                <ProfilePhoto className="setup-profile__photo" fallback={<Icon name="users" />} />
+                {photoSaved && <ProfilePhoto className="setup-profile__photo" fallback={<Icon name="users" />} />}
                 <ProfilePhotoUpload label={photoSaved ? 'Change photo' : 'Choose photo'} onUploaded={() => setPhotoSaved(true)} onBusyChange={setPhotoBusy} />
               </div>
               {photoSaved && <button type="button" className="button button--primary" disabled={photoBusy} onClick={() => onContinue?.('enabled')}>Continue<Icon name="chevron" /></button>}
@@ -56,6 +54,7 @@ export function PwaOnboarding({ open, onClose, onInstall, ios, nativeInstall, st
               {installMessage && <p className="setup-reassurance" role="status">{installMessage}</p>}
             </>}
             {!(profile && photoSaved) && <button type="button" disabled={busy} className="setup-later" onClick={() => onContinue?.('later')}>Not now<Icon name="chevron" /></button>}
+            </div>
           </div>
         </div>
       </div>

@@ -13,6 +13,44 @@ import { PageHeader } from './ui';
 
 type Notice = { id:string;title:string;body:string;href:string;event_key:string;read_at:string|null;created_at:string;actor_id?:string|null;actor_name?:string|null };
 type Area = 'management' | 'caretaker' | 'tenant';
+type NoticeCategory = '' | 'payments' | 'maintenance' | 'concerns' | 'accounts' | 'visits';
+
+const noticeCategories: { id: NoticeCategory; label: string }[] = [
+  { id: '', label: 'All' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'maintenance', label: 'Maintenance' },
+  { id: 'concerns', label: 'Concerns' },
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'visits', label: 'Visits' },
+];
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function noticeDayLabel(value: string, now = new Date()) {
+  const date = new Date(value);
+  const daysAgo = Math.round((startOfLocalDay(now) - startOfLocalDay(date)) / 86_400_000);
+  if (daysAgo <= 0) return 'Today';
+  if (daysAgo === 1) return 'Yesterday';
+  if (daysAgo < 7) return new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(date);
+  return new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric' }).format(date);
+}
+
+function noticeTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value));
+}
+
+function groupNoticesByDay(rows: Notice[]) {
+  const groups: { label: string; rows: Notice[] }[] = [];
+  for (const row of rows) {
+    const label = noticeDayLabel(row.created_at);
+    const group = groups[groups.length - 1];
+    if (group?.label === label) group.rows.push(row);
+    else groups.push({ label, rows: [row] });
+  }
+  return groups;
+}
 
 function NoticeAvatar({ name, userId, className, version, fallback = 'users' }: { name?: string | null; userId?: string | null; className: string; version: number; fallback?: IconName }) {
   const [failedVersion, setFailedVersion] = useState<number | null>(null);
@@ -40,7 +78,9 @@ export function NotificationWorkspace({ area }: { area: Area }) {
   const [page,setPage] = useState(1);
   const [query,setQuery] = useState('');
   const [read,setRead] = useState('');
+  const [category,setCategory] = useState<NoticeCategory>('');
   const [selectedId,setSelectedId] = useState('');
+  const [openingNotificationId,setOpeningNotificationId] = useState('');
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
   const detailHeading = useRef<HTMLHeadingElement>(null);
@@ -51,13 +91,13 @@ export function NotificationWorkspace({ area }: { area: Area }) {
     const request = requests.current.start();
     setLoading(true);
     try {
-      const params = new URLSearchParams({ resource:'notifications',page:String(page),search:query,read });
+      const params = new URLSearchParams({ resource:'notifications',page:String(page),search:query,read,category });
       const response = await fetch(`/api/operations?${params}`, { signal: request.signal });
       if (!response.ok) throw new Error();
       const result = await response.json(); if (!request.isCurrent()) return; setRows(result.rows);setCount(result.count);setPhotoVersion(Date.now());setError('');
     } catch { if (!request.isCurrent()) return; setError('Notifications could not be loaded.'); }
     finally { if (request.isCurrent()) setLoading(false); }
-  },[page,query,read]);
+  },[page,query,read,category]);
   useEffect(() => { const activeRequests = requests.current; const timer=window.setTimeout(() => void load(),150);return () => { window.clearTimeout(timer); activeRequests.cancel(); }; },[load]);
   useEffect(() => {
     const updated = () => { void load(); };
@@ -78,37 +118,84 @@ export function NotificationWorkspace({ area }: { area: Area }) {
     } catch { /* Show the same retryable error for a network failure. */ }
     setError('Notification could not be marked read.'); return false;
   }
+  async function markUnread(id:string) {
+    try {
+      const response = await fetch('/api/operations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'notification.unread',data:{id}})});
+      if (!response.ok) throw new Error();
+      setRows(current => current.map(row => row.id === id ? {...row,read_at:null} : row));
+      window.dispatchEvent(new Event('mapsilip-notifications-updated'));
+    } catch { setError('Notification could not be marked unread.'); }
+  }
+  async function openMaintenanceRoom(row: Notice) {
+    const requestId = /^maintenance:([0-9a-f-]{36}):/i.exec(row.event_key)?.[1];
+    if (!requestId) { setSelectedId(row.id); return; }
+    setOpeningNotificationId(row.id);
+    setError('');
+    try {
+      const response = await fetch(`/api/operations?${new URLSearchParams({ resource:'maintenance',recordId:requestId })}`);
+      if (!response.ok) throw new Error();
+      const result = await response.json() as { rows?: { room_id?: string | null }[] };
+      const roomId = result.rows?.[0]?.room_id;
+      if (!roomId) throw new Error();
+      await markRead(row.id);
+      const path = area === 'management' ? '/management/maintenance' : '/caretaker/maintenance';
+      router.push(`${path}?view=building&roomId=${encodeURIComponent(roomId)}`);
+    } catch {
+      setError('The room for this request could not be opened.');
+      setSelectedId(row.id);
+    } finally { setOpeningNotificationId(''); }
+  }
+  function selectNotification(row: Notice, button: HTMLButtonElement) {
+    lastSelectedButton.current = button;
+    setSelectedId(row.id);
+    if (!row.read_at) void markRead(row.id);
+  }
   const selected = rows.find(row => row.id === selectedId) ?? null;
+  const groups = groupNoticesByDay(rows);
   return <div className={`notifications-workspace${selected ? ' has-selection' : ''}`}><PageHeader title="Notifications" action={<button type="button" className="button button--secondary" onClick={() => window.dispatchEvent(new Event('mapsilip-open-app-settings'))}><Icon name="bell" />Settings</button>} />
     <label className="notifications-search"><Icon name="search" /><span className="sr-only">Search notifications</span>
       <input type="search" placeholder="Search notifications..." value={query} onChange={event => { setQuery(event.target.value);setPage(1);setSelectedId(''); }} /></label>
     <div className="notifications-filters" role="group" aria-label="Filter notifications">
-      {[[ '', 'All' ],[ 'unread', 'Unread' ]].map(([id,label]) => <button type="button" key={id}
-        aria-pressed={read===id} className={read===id ? 'is-active' : ''}
-        onClick={() => { setRead(id);setPage(1);setSelectedId(''); }}>{label}</button>)}
+      {noticeCategories.map(({ id, label }) => <button type="button" key={id || 'all'}
+        aria-pressed={category===id} className={category===id ? 'is-active' : ''}
+        onClick={() => { setCategory(id);setPage(1);setSelectedId(''); }}>{label}</button>)}
+      <button type="button" aria-pressed={read==='unread'} className={`notifications-filters__unread${read==='unread' ? ' is-active' : ''}`}
+        onClick={() => { setRead(current => current === 'unread' ? '' : 'unread');setPage(1);setSelectedId(''); }}>Unread only</button>
     </div>
     {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
     {loading && !rows.length ? <DataSkeleton label="Loading notifications" /> : rows.length ? <div className={`notifications-workspace__split${selected ? ' has-selection' : ''}`}>
-      <section className="notifications-list" aria-label="Notification list">{rows.map(row => <article key={row.id} className={`notifications-list__item${row.read_at ? '' : ' is-unread'}${selectedId === row.id ? ' is-selected' : ''}`}>
-        <button type="button" className="notifications-list__select" aria-pressed={selectedId === row.id} aria-controls="notification-detail" onClick={event => { lastSelectedButton.current = event.currentTarget; setSelectedId(row.id); }}>
+      <section className="notifications-list" aria-label="Notification list">{groups.map(group => <section className="notifications-list__group" key={group.label} aria-label={group.label}>
+        <h2 className="notifications-list__day">{group.label}</h2>
+        {group.rows.map(row => <article key={row.id} className={`notifications-list__item${row.read_at ? '' : ' is-unread'}${selectedId === row.id ? ' is-selected' : ''}`}>
+        <button type="button" className="notifications-list__select" aria-pressed={selectedId === row.id} aria-controls="notification-detail" aria-busy={openingNotificationId === row.id} disabled={Boolean(openingNotificationId)} onClick={event => selectNotification(row, event.currentTarget)}>
           <NoticeAvatar version={photoVersion} key={row.actor_id ?? row.id} name={row.actor_name} userId={row.actor_id} className="notifications-list__icon" fallback={noticeIcon(row)} />
-          <span className="notifications-list__copy">{row.actor_name && <small>{row.actor_name}</small>}<strong>{row.title}</strong><span>{row.body}</span><time dateTime={row.created_at}>{new Date(row.created_at).toLocaleString()}</time></span>
+          <span className="notifications-list__copy"><span className="notifications-list__main"><strong>{row.title}</strong>{row.actor_name && <small>{row.actor_name}</small>}<span>{row.body}</span></span><time dateTime={row.created_at} title={new Date(row.created_at).toLocaleString()}>{noticeTime(row.created_at)}</time></span>
           {!row.read_at && <span className="notifications-list__unread-dot" aria-label="Unread" />}
         </button>
 
-      </article>)}</section>
+      </article>)}</section>)}</section>
       {selected && <aside id="notification-detail" className="notifications-detail" aria-label="Notification details">
         <div key={selected.id} className="notifications-detail__content">
           <button type="button" className="notifications-detail__back" onClick={() => { setSelectedId(''); requestAnimationFrame(() => lastSelectedButton.current?.focus()); }}>← Back</button>
-          <NoticeAvatar version={photoVersion} key={selected.actor_id ?? selected.id} name={selected.actor_name} userId={selected.actor_id} className="notifications-detail__icon" fallback={noticeIcon(selected)} />
+          <NoticeAvatar version={photoVersion} name={selected.actor_name} userId={selected.actor_id} className="notifications-detail__icon" fallback={noticeIcon(selected)} />
           {selected.actor_name && <strong className="notifications-detail__actor">{selected.actor_name}</strong>}
           <span className={`notifications-detail__status${selected.read_at ? '' : ' is-unread'}`}>{selected.read_at ? 'Read' : 'Unread'}</span>
           <h2 ref={detailHeading} tabIndex={-1}>{selected.title}</h2><p>{selected.body}</p>
           <time dateTime={selected.created_at}>{new Date(selected.created_at).toLocaleString()}</time>
-          <NotificationRecordDetail key={selected.id} eventKey={selected.event_key} area={area} />
+          <NotificationRecordDetail eventKey={selected.event_key} />
           <div className="notifications-detail__actions">
-            {!selected.read_at && <button type="button" className="button button--secondary" onClick={() => void markRead(selected.id)}>Mark as read</button>}
-            <Link className="button button--primary" href={selected.href} onClick={async event => { if (selected.read_at) return; event.preventDefault(); if (await markRead(selected.id)) router.push(selected.href); }}>Open full page <Icon name="arrow" /></Link>
+            {selected.read_at && <button type="button" className="button button--secondary" onClick={() => void markUnread(selected.id)}>Mark as unread</button>}
+            <Link className="button button--primary" href={selected.href} aria-busy={openingNotificationId === selected.id} onClick={async event => {
+              if (openingNotificationId) { event.preventDefault(); return; }
+              if (area !== 'tenant' && selected.event_key.startsWith('maintenance:')) {
+                event.preventDefault();
+                await openMaintenanceRoom(selected);
+                return;
+              }
+              if (selected.read_at) return;
+              event.preventDefault();
+              if (await markRead(selected.id)) router.push(selected.href);
+            }}>{openingNotificationId === selected.id ? 'Opening…' : 'Open full page'} <Icon name="arrow" /></Link>
           </div>
         </div>
       </aside>}

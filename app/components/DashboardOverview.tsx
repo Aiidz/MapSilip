@@ -175,7 +175,7 @@ export function DashboardOverview({ role, showAccessRequests = false, showExport
     { title:'Maintenance', text:'Requests and updates', href:'/tenant/maintenance', icon:'wrench' as const },
     { title:'Concerns & Suggestions', text:'Share feedback with the team', href:'/tenant/concerns', icon:'sparkles' as const },
   ];
-  return <div className="tenant-home"><section className="tenant-home-summary tenant-home-summary--welcome"><div><h1><span className="tenant-greeting-desktop">Welcome back, {tenantName}!</span><span className="tenant-greeting-mobile">Hello, <strong>{tenantName}!</strong></span></h1><p>Manage your stay and keep track of your dormitory activities.</p></div>
+  return <div className="tenant-home"><section className="tenant-home-summary tenant-home-summary--welcome"><div><h1><span className="tenant-greeting-desktop">Welcome back, {tenantName}!</span><span className="tenant-greeting-mobile">Hello, <strong>{tenantName}!</strong></span></h1></div>
       <div className="tenant-home-summary__facts"><div><span>Your room</span><strong>{text(data?.room)}</strong></div><div><span>Monthly rent</span><strong>{formatTenantMonthlyRent(data?.monthly_rent as number | string | null | undefined)}</strong></div></div>
     </section>{retry}
     <section className="tenant-home-shortcuts" aria-labelledby="tenant-shortcuts-title"><div className="tenant-section-heading"><div><h2 id="tenant-shortcuts-title">Quick Access</h2><p>Common details and services.</p></div></div>

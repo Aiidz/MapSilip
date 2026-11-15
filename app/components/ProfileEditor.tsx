@@ -70,7 +70,7 @@ export function ProfileEditor({ role = 'owner' }: { role?: 'owner' | 'caretaker'
       <ProfilePhotoUpload />
     </aside></div>
   </div>;
-  return <div className={`tenant-profile-page${role === 'owner' ? ' management-profile-page' : ''}`}><PageHeader title="Profile Settings" description="Manage your account information and security." />
+  return <div className="tenant-profile-page management-profile-page"><PageHeader title="Profile Settings" description="Manage your account information and security." />
     <div className="tenant-profile-grid"><div className="tenant-profile-forms">
       <Panel title="Personal Information" description="Update your personal and contact details." icon="users">
         <form className="tenant-profile-form" onSubmit={save}>
