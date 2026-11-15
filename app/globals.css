@@ -262,7 +262,6 @@ html {
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 95%, transparent);
   backdrop-filter: blur(12px);
-  transition: transform 260ms var(--motion-ease), opacity 180ms ease;
 }
 .brand {
   display: inline-flex;
@@ -1356,7 +1355,8 @@ html {
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 5px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: blur(10px);
   box-shadow: var(--shadow-soft);
 }
 .nav-link {
@@ -1406,21 +1406,8 @@ html {
     display: grid;
     height: 100vh;
     height: 100svh;
-    grid-template-rows: 72px minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
     overflow: hidden;
-    transition: grid-template-rows 260ms var(--motion-ease);
-  }
-  .app-shell--topbar-hidden {
-    grid-template-rows: 0px minmax(0, 1fr) auto;
-  }
-  .app-shell--topbar-hidden .mobile-topbar {
-    min-height: 0;
-    overflow: hidden;
-    padding-block: 0;
-    border: 0;
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
   }
   .main-content {
     min-height: 0;
@@ -1428,10 +1415,8 @@ html {
     overscroll-behavior-y: contain;
     padding-bottom: 24px;
   }
-  .mobile-nav {
-    position: static;
-    margin: 0 10px calc(10px + env(safe-area-inset-bottom));
-  }
+  .main-content > .mobile-topbar { position: static; top: auto; }
+  .main-content::after { content: ""; display: block; height: calc(88px + env(safe-area-inset-bottom)); }
 }
 
 @media (min-width: 1000px) {
@@ -1442,8 +1427,6 @@ html {
   html {
     scroll-behavior: auto;
   }
-  .app-shell { transition: none; }
-  .mobile-topbar { transition: none; }
   .skeleton {
     animation: none;
     background: var(--border-strong);
