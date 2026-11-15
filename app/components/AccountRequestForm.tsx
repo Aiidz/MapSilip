@@ -1,9 +1,16 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { ApplicantRoomPicker } from './ApplicantRoomPicker';
 import { Icon } from './Icon';
 
-export function AccountRequestForm() {
+export function AccountRequestForm({ onStageChange }: { onStageChange?: (stage: 'details' | 'rooms' | 'sent') => void }) {
+  const [step, setStep] = useState<'details' | 'rooms'>('details');
+  const [gender, setGender] = useState('');
+  const [preferredRoom, setPreferredRoom] = useState('');
+  const [roomReload, setRoomReload] = useState(0);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (step === 'rooms') heading.current?.focus(); }, [step]);
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,6 +41,11 @@ export function AccountRequestForm() {
       return;
     }
 
+    if (step === 'details') {
+      setGender(String(data.get('gender') || '')); setStep('rooms'); onStageChange?.('rooms'); setMessage('');
+      return;
+    }
+    if (!preferredRoom) { setMessage('Choose a preferred room.'); return; }
     const name = [firstName, middleName, lastName].filter(Boolean).join(' ');
     setBusy(true);
     setMessage('');
@@ -45,22 +57,25 @@ export function AccountRequestForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
+          preferred_room_id: preferredRoom,
           first_name: firstName,
           last_name: lastName,
           middle_name: middleName,
           email,
           phone,
+          gender: String(data.get('gender') || ''),
           password,
           confirm_password: confirmPassword,
         }),
       });
       const result = await response.json();
       if (response.ok) {
-        setIsSuccess(true);
+        setIsSuccess(true); onStageChange?.('sent');
         setMessage(result.message || 'Account request submitted. Awaiting administrator approval and room assignment.');
         form.reset();
       } else {
         setIsSuccess(false);
+        if (result.error === 'room_unavailable') { setPreferredRoom(''); setRoomReload(value => value + 1); }
         setMessage(result.message || 'Your request could not be sent. Please check your information and try again.');
       }
     } catch {
@@ -71,8 +86,11 @@ export function AccountRequestForm() {
     }
   }
 
+  if (isSuccess) return <div className="applicant-request-sent" role="status"><Icon name="shield" /><p>Your preferred room is included. Management will confirm your assignment.</p></div>;
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="applicant-request-form">
+      <nav className="applicant-request-steps" aria-label="Request progress"><span aria-current={step === 'details' ? 'step' : undefined}>1 · Your details</span><span aria-current={step === 'rooms' ? 'step' : undefined}>2 · Room preference</span></nav>
+      <div hidden={step !== 'details'}>
       <h3 className="auth-section-title">Personal Information</h3>
       <div className="auth-row">
         <div className="auth-field">
@@ -119,6 +137,7 @@ export function AccountRequestForm() {
         />
       </div>
 
+      <fieldset className="auth-field request-gender"><legend>Gender</legend><div className="request-gender__options"><label><input type="radio" name="gender" value="male" required checked={gender === 'male'} onChange={() => setGender('male')} /><span>Male</span></label><label><input type="radio" name="gender" value="female" required checked={gender === 'female'} onChange={() => setGender('female')} /><span>Female</span></label></div></fieldset>
       <h3 className="auth-section-title">Account Information</h3>
       <div className="auth-field">
         <label htmlFor="request-email">Email Address</label>
@@ -126,7 +145,7 @@ export function AccountRequestForm() {
           id="request-email"
           name="email"
           type="email"
-          placeholder="admin@gmail.com"
+          placeholder="you@example.com"
           autoComplete="email"
           maxLength={320}
           required
@@ -181,9 +200,13 @@ export function AccountRequestForm() {
         </span>
       </div>
 
-      <button className="auth-submit" type="submit" disabled={busy} aria-busy={busy}>
-        {busy ? 'Submitting Request…' : 'Request Account'}
+      </div>
+      {step === 'rooms' && <><h3 ref={heading} tabIndex={-1} className="auth-section-title">Choose your preferred room</h3><p className="applicant-picker__hint">Subject to administrator approval.</p><ApplicantRoomPicker gender={gender} selected={preferredRoom} onSelect={setPreferredRoom} reload={roomReload} /></>}
+      <div className="applicant-request-actions">{step === 'rooms' && <button className="applicant-request-back" type="button" disabled={busy} onClick={() => { setStep('details'); onStageChange?.('details'); setPreferredRoom(''); setMessage(''); }}>← Back</button>}
+      <button className="auth-submit" type="submit" disabled={busy || (step === 'rooms' && !preferredRoom)} aria-busy={busy}>
+        {busy ? 'Sending…' : step === 'details' ? 'Continue' : 'Send request'}
       </button>
+      </div>
 
       {message && (
         <p

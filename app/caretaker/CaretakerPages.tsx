@@ -1,11 +1,15 @@
 "use client";
 
+import { CloseIcon } from "../components/CloseIcon";
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Icon } from "../components/Icon";
+import { MobileDetailSurface } from "../components/MobileDetailSurface";
 import { ResponsiveOverlay } from "../components/ResponsiveOverlay";
 import { EmptyState, PageHeader, Panel } from "../components/ui";
 import dynamic from 'next/dynamic';
-const BuildingMapWorkspace = dynamic(() => import('../components/BuildingMapWorkspace').then(module => module.BuildingMapWorkspace), { loading: () => <div role="status" className="map-loading">Loading maintenance map…</div> });
+const BuildingMapWorkspace = dynamic(() => import('../components/BuildingMapWorkspace').then(module => module.BuildingMapWorkspace), { loading: () => <MapLoading label="Loading maintenance map…" /> });
+import { MapLoading } from '../components/MapLoading';
 import { ProfilePhoto, ProfilePhotoUpload } from "../components/ProfilePhoto";
 
 const requestSummary = ["Total Requests", "Pending", "In Progress", "Urgent Requests"];
@@ -140,10 +144,10 @@ export function CaretakerMaintenance() {
         </button>)}</div> : <EmptyState title="No requests to display" description={query || roomFilter ? "No requests match this room." : "Maintenance requests will appear here."} icon="wrench" />}
         {count > 100 && <div className="operational-pagination"><button type="button" disabled={page===1} onClick={() => { setPage(page-1);setSelected(null); }}>Previous</button><span>{page} / {Math.ceil(count/100)}</span><button type="button" disabled={page*100>=count} onClick={() => { setPage(page+1);setSelected(null); }}>Next</button></div>}
       </div>
-      <Panel title="Maintenance Details" className="caretaker-request-details">
+      <MobileDetailSurface open={Boolean(selected)} onClose={() => setSelected(null)} title="Maintenance Details">      <Panel title="Maintenance Details" className="caretaker-request-details">
         {selected ? <div className="caretaker-selected-details">
           <>
-            <button type="button" className="caretaker-details-close" aria-label="Close maintenance details" onClick={() => setSelected(null)}>×</button>
+            <button type="button" className="caretaker-details-close" aria-label="Close maintenance details" onClick={() => setSelected(null)}><CloseIcon /></button>
             <h3>Request Information</h3>
             <div className="caretaker-details-grid">
               <p><small>Repair Category</small><strong>{String(selected.category)}</strong></p>
@@ -162,7 +166,7 @@ export function CaretakerMaintenance() {
             {selected.status !== 'resolved' && <button type="button" className="button button--secondary" onClick={() => setResponding(true)}>Respond</button>}
           </>
         </div> : <EmptyState title="No request selected" description="Select a maintenance request to view its details." icon="fileSearch" />}
-      </Panel>
+      </Panel></MobileDetailSurface>
     </div>
     <ResponsiveOverlay
       open={responding && Boolean(selected)}

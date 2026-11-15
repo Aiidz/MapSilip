@@ -10,18 +10,15 @@ export function FeaturePreview({
   sectionTitle = "Your overview",
 }: {
   title: string;
-  description: string;
   icon: IconName;
   emptyTitle: string;
+  description: string;
   emptyDescription: string;
   sectionTitle?: string;
 }) {
   return (
     <>
-      <PageHeader
-        title={title}
-        description={description}
-      />
+      <PageHeader title={title} description={description} />
       <Panel title={sectionTitle} icon={icon}>
         <EmptyState
           title={emptyTitle}

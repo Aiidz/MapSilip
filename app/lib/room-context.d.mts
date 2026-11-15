@@ -27,7 +27,7 @@ export type RoomMaintenance = {
   updated_at: string;
 };
 export type RoomContext = {
-  room: { id: string; room_number: string; floor_label: string; capacity: number; availability: string };
+  room: { id: string; room_number: string; floor_label: string; capacity: number; monthly_rent?: number | null; gender_policy?: string; availability: string };
   viewer_role: 'owner' | 'caretaker';
   residents: RoomResident[];
   visits: RoomVisit[];

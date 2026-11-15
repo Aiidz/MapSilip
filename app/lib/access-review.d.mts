@@ -1,0 +1,2 @@
+export type ReviewRoom = { id: string; room_number: string; floor_label: string; capacity: number; availability: string; monthly_rent: number | null; gender_policy: 'any' | 'male' | 'female' };
+export function reviewRoomOptions(rooms: ReviewRoom[], assignments: { room_id: string; ended_on: string | null }[], gender?: string): (ReviewRoom & { vacancies: number; reason: string; eligible: boolean })[];

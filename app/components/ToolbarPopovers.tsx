@@ -1,5 +1,7 @@
 "use client";
 
+import { CloseIcon } from "./CloseIcon";
+
 import { DataSkeleton } from "./DataSkeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -109,7 +111,7 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok || !result || typeof result !== "object" ||
           (result as Record<string, unknown>).state !== "signed-out") throw new Error();
-      router.replace("/login");
+      window.location.replace("/login");
     } catch {
       setSigningOut(false);
       setSignOutError(true);
@@ -143,7 +145,7 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
     >
       <div className="toolbar-popover__heading">
         <div><h2 id={notificationsTitleId}>Notifications</h2><p>Your unread updates.</p></div>
-        <button className="toolbar-popover__close" type="button" aria-label="Close notifications" onClick={() => { setOpen(null); notificationsTrigger.current?.focus(); }}><span aria-hidden="true">×</span></button>
+        <button className="toolbar-popover__close" type="button" aria-label="Close notifications" onClick={() => { setOpen(null); notificationsTrigger.current?.focus(); }}><CloseIcon /></button>
       </div>
       {authEnabled && !unreadLoaded && !notificationRows.length ? <DataSkeleton label="Loading notifications" count={2} /> : notificationRows.length ? <ul className="toolbar-notification-list">{notificationRows.map(item =>
         <li key={item.id}><Link href={item.href} onClick={async event => {
@@ -194,7 +196,9 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
       className={`toolbar-popovers${compact ? " toolbar-popovers--compact" : ""}`}
       ref={rootRef}
       onBlurCapture={(event) => {
-        if (!containsTarget(event.relatedTarget)) setOpen(null);
+        // Safari touch taps can blur to no focused element before the click fires.
+        // Outside pointer presses already dismiss the menu, including its portal.
+        if (event.relatedTarget !== null && !containsTarget(event.relatedTarget)) setOpen(null);
       }}
     >
       <div className="toolbar-popup-anchor">

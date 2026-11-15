@@ -3,7 +3,7 @@ export function noticeContinuation(value: unknown) {
   return typeof value === 'string' && noticeId.test(value) ? `/notifications/open?id=${value}` : null;
 }
 const allowed: Record<'owner' | 'caretaker' | 'tenant', readonly string[]> = {
-  owner: ['/management', '/management/tenants', '/management/rooms', '/management/maintenance', '/management/payments', '/management/visitors', '/management/concerns', '/management/notifications'],
+  owner: ['/management/storage', '/management', '/management/tenants', '/management/rooms', '/management/maintenance', '/management/payments', '/management/visitors', '/management/concerns', '/management/notifications'],
   caretaker: ['/caretaker', '/caretaker/maintenance', '/caretaker/notifications'],
   tenant: ['/tenant', '/tenant/details', '/tenant/maintenance', '/tenant/payments', '/tenant/visitors', '/tenant/concerns', '/tenant/notifications'],
 };

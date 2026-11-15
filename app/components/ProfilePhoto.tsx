@@ -1,11 +1,12 @@
 'use client';
 
+import { uploadAttachment } from '../lib/uploads/client';
 import Image from 'next/image';
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
 const photoUpdated = 'mapsilip-profile-photo-updated';
 
-export function ProfilePhoto({ className, fallback }: { className: string; fallback: ReactNode }) {
+export function ProfilePhoto({ className, fallback, userId }: { className: string; fallback: ReactNode; userId?: string }) {
   const [version, setVersion] = useState(0);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -15,13 +16,13 @@ export function ProfilePhoto({ className, fallback }: { className: string; fallb
   }, []);
   return <span className={`${className} profile-photo${loaded ? ' profile-photo--loaded' : ''}`} aria-hidden="true">
     {!loaded && fallback}
-    <Image src={`/api/profile/photo?v=${version}`} alt="" width={88} height={88} unoptimized
+    <Image key={userId} src={`/api/profile/photo?v=${version}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`} alt="" width={88} height={88} unoptimized
       className={loaded ? 'profile-photo__image is-loaded' : 'profile-photo__image'}
       onLoad={() => setLoaded(true)} onError={() => setLoaded(false)} />
   </span>;
 }
 
-export function ProfilePhotoUpload() {
+export function ProfilePhotoUpload({ label = 'Change Photo', onUploaded, onBusyChange }: { label?: string; onUploaded?: () => void; onBusyChange?: (busy: boolean) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -30,17 +31,9 @@ export function ProfilePhotoUpload() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || busy) return;
-    if (!['image/jpeg', 'image/png'].includes(file.type) || file.size < 1 || file.size > 2_097_152) {
-      setMessage('Choose a JPEG or PNG image under 2 MB.');
-      return;
-    }
-    setBusy(true); setMessage('');
+    setBusy(true); onBusyChange?.(true); setMessage('');
     try {
-      const body = new FormData();
-      body.set('purpose', 'profile');
-      body.set('file', file);
-      const response = await fetch('/api/attachments', { method: 'POST', body, credentials: 'same-origin' });
-      if (!response.ok) throw new Error();
+      await uploadAttachment(file, 'profile');
       const preview = await fetch(`/api/profile/photo?v=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
       if (!preview.ok || !preview.headers.get('content-type')?.startsWith('image/')) {
         setMessage('Photo uploaded, but it could not be displayed. Please reload and try again.');
@@ -48,13 +41,14 @@ export function ProfilePhotoUpload() {
       }
       window.dispatchEvent(new Event(photoUpdated));
       setMessage('Photo updated.');
-    } catch { setMessage('Photo could not be updated. Please try again.'); }
-    finally { setBusy(false); }
+      onUploaded?.();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Photo could not be updated. Please try again.'); }
+    finally { setBusy(false); onBusyChange?.(false); }
   }
 
   return <div className="profile-photo-control">
     <input ref={input} className="sr-only" type="file" accept="image/jpeg,image/png" aria-label="Choose profile photo" onChange={upload} tabIndex={-1} />
-    <button className="button button--secondary" type="button" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Uploading…' : 'Change Photo'}</button>
+    <button className="button button--secondary" type="button" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Uploading…' : label}</button>
     {message && <p role="status">{message}</p>}
   </div>;
 }

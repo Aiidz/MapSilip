@@ -1,3 +1,4 @@
+import { recordAttachmentLinkFailure } from '@/app/lib/storage/link-failure';
 import { NextResponse, type NextRequest } from 'next/server';
 import { assertRequestOrigin } from '@/app/lib/backend/auth/dependencies';
 import { requireStaffAccess } from '@/app/lib/backend/server';
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     assertRequestOrigin(request);
     await requireStaffAccess('tenant.application.approve');
     const body = await request.json();
-    const { id, decision, room_id, started_on, note } = body;
+    const { id, decision, room_id, started_on, note, contract_attachment_id, contract_end_on } = body;
 
     if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id) || !['approved', 'rejected'].includes(decision)) {
       throw new BackendError('invalid_input');
@@ -30,17 +31,22 @@ export async function POST(request: NextRequest) {
       throw new BackendError('invalid_input');
     }
 
+    if (contract_attachment_id != null && (typeof contract_attachment_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(contract_attachment_id))) throw new BackendError('invalid_input');
+    if (contract_end_on != null && (typeof contract_end_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(contract_end_on))) throw new BackendError('invalid_input');
+    if (decision === 'rejected' && (typeof note !== 'string' || !note.trim())) throw new BackendError('invalid_input');
     const client = await createSupabaseServerClient();
-    const { error, data } = await client.rpc('mapsilip_review_account_request', {
+    const { error, data } = await client.rpc('mapsilip_review_account_contract', {
       p_id: id,
       p_decision: decision,
-      p_invitation_hash: null,
       p_room_id: decision === 'approved' ? room_id : null,
       p_started_on: decision === 'approved' ? (started_on || null) : null,
       p_note: typeof note === 'string' ? note.trim() : null,
+      p_contract_id: contract_attachment_id ?? null,
+      p_contract_end_on: contract_end_on ?? null,
     });
 
     if (error || data?.state !== decision) {
+      await recordAttachmentLinkFailure(client, contract_attachment_id);
       throw new BackendError('invalid_input');
     }
 

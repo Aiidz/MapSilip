@@ -23,17 +23,20 @@ export const getTenantAccess = cache(async function getTenantAccess() {
 export const getTenantProfile = cache(async function getTenantProfile() {
   const { client, session, identity, data } = await getTenantAccess();
   const [assignment, invoice] = await Promise.all([
-    client.from('room_assignments').select('room_id,started_on,rooms(room_number)')
+    client.from('room_assignments').select('room_id,started_on,contract_attachment_id,contract_end_on,contract_monthly_rent,rooms(room_number,monthly_rent)')
       .eq('tenant_id', identity.userId).is('ended_on', null).maybeSingle(),
     client.from('invoices').select('coverage_start,coverage_end,amount,currency,due_on')
       .eq('tenant_id', identity.userId).order('due_on', { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (assignment.error || invoice.error) throw new BackendError('unavailable');
-  const room = assignment.data?.rooms as { room_number?: string } | { room_number?: string }[] | null | undefined;
+  const room = assignment.data?.rooms as { room_number?: string; monthly_rent?: number | null } | { room_number?: string; monthly_rent?: number | null }[] | null | undefined;
   return Object.freeze({ userId: identity.userId, displayName: data.display_name, email: session.email,
     phone: data.phone, emergencyContact: data.emergency_contact,
     roomNumber: Array.isArray(room) ? room[0]?.room_number : room?.room_number,
     startedOn: assignment.data?.started_on,
+    contractAttachmentId: assignment.data?.contract_attachment_id,
+    contractEndOn: assignment.data?.contract_end_on,
+    monthlyRent: assignment.data?.contract_monthly_rent ?? (Array.isArray(room) ? room[0]?.monthly_rent : room?.monthly_rent),
     invoice: invoice.data });
 });
 

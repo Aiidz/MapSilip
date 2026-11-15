@@ -1,3 +1,4 @@
+import { StorageReviewReminders } from '../components/StorageReviewReminders';
 import { pushAvailable } from '../lib/backend/push/config';
 import { AppShell } from "../components/AppShell";
 import { redirect } from "next/navigation";
@@ -20,5 +21,5 @@ export default async function ManagementLayout(
     if (error instanceof BackendError && ["unauthenticated", "forbidden"].includes(error.code)) redirect("/login");
     throw error;
   }
-  return <AppShell pushEnabled={pushAvailable()} authenticatedUserId={authenticatedUserId} area="management" staffAuthEnabled={staffAuthEnabled}>{children}</AppShell>;
+  return <AppShell pushEnabled={pushAvailable()} authenticatedUserId={authenticatedUserId} area="management" staffAuthEnabled={staffAuthEnabled}>{process.env.STORAGE_MANAGEMENT_ENABLED === 'true' && <StorageReviewReminders />}{children}</AppShell>;
 }

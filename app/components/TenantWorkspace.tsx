@@ -1,11 +1,17 @@
 'use client';
 
+import { uploadAttachment } from '../lib/uploads/client';
+import { CloseIcon } from "./CloseIcon";
+
 import { DataSkeleton } from './DataSkeleton';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createLatestRequest, fetchOperationRows } from '../lib/workspace-loading';
 import { Icon } from './Icon';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
+import { PaymentProofViewer } from './PaymentProofViewer';
+import { MaintenanceSubmissionDetails } from './MaintenanceSubmissionDetails';
+import { MobileDetailSurface } from './MobileDetailSurface';
 import { TenantDropdown, TenantFileDropzone } from './TenantFormControls';
 import { EmptyState, PageHeader, Panel } from './ui';
 
@@ -31,13 +37,6 @@ async function operate(action: string, data: Record<string,unknown>) {
   if (!response.ok) throw new Error('The request could not be saved. Check the details and try again.');
 }
 
-async function upload(file: File, purpose: 'payment' | 'maintenance') {
-  const body = new FormData(); body.set('file',file); body.set('purpose',purpose);
-  const response = await fetch('/api/attachments',{ method:'POST',body });
-  if (!response.ok) throw new Error('The file could not be uploaded. Use a PNG, JPEG, or PDF under 2 MB.');
-  const value = await response.json();
-  return value.id as string;
-}
 
 function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
   kind: Kind; invoices: Row[]; roomLabel?: string; open: boolean; onClose: () => void; onSaved: () => void;
@@ -50,6 +49,7 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
   const [invoiceIdOverride, setInvoiceIdOverride] = useState<string | null>(null);
   const [amountOverride, setAmountOverride] = useState<string | null>(null);
   const [method, setMethod] = useState('gcash');
+  const [cashRecipient, setCashRecipient] = useState('');
   const [category, setCategory] = useState(kind === 'maintenance' ? 'Furniture & Fixtures' : 'Cleanliness & Sanitation');
 
   const selectedInvoice = invoiceIdOverride ?? (invoices[0] ? String(invoices[0].id) : '');
@@ -71,7 +71,9 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
 
   const methodOptions = [
     { value: 'gcash', label: 'GCash' },
-    { value: 'bank_transfer', label: 'Bank transfer' },
+    { value: 'e_wallet', label: 'E-wallet' },
+    { value: 'bank_transfer', label: 'Bank' },
+    { value: 'cash', label: 'Cash' },
   ];
 
   const maintenanceCategories = [
@@ -107,13 +109,13 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
     try {
       if (kind === 'payments') {
         const file = fields.get('file');
-        if (!(file instanceof File) || !file.size) throw new Error('Select a payment proof.');
-        const attachmentId = await upload(file,'payment');
+        if (method !== 'cash' && (!(file instanceof File) || !file.size)) throw new Error('Select a payment proof.');
+        const attachmentId = method === 'cash' ? null : await uploadAttachment(file as File,'payment');
         await operate('payment.submit',{ request_key:requestKey, invoice_id:fields.get('invoice_id'),
-          amount:fields.get('amount'),method:fields.get('method'),reference_number:fields.get('reference_number'),attachment_id:attachmentId });
+          amount:fields.get('amount'),method:fields.get('method'),cash_recipient:method === 'cash' ? fields.get('cash_recipient') : null,reference_number:fields.get('reference_number'),attachment_id:attachmentId });
       } else if (kind === 'maintenance') {
         const file = fields.get('file');
-        const attachmentId = file instanceof File && file.size ? await upload(file,'maintenance') : null;
+        const attachmentId = file instanceof File && file.size ? await uploadAttachment(file,'maintenance') : null;
         await operate('maintenance.create',{ request_key:requestKey,category:fields.get('category'),
           description:fields.get('description'),attachment_id:attachmentId });
       } else {
@@ -121,6 +123,7 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
       }
       setRequestKey(crypto.randomUUID());
       form.reset();
+      setCashRecipient('');
       onSaved();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'The request could not be saved.'); }
     finally { setBusy(false); }
@@ -130,6 +133,7 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
     onClose={close}
     title={kind === 'payments' ? 'Submit payment proof' : kind === 'maintenance' ? 'New maintenance request' : 'New concern or suggestion'}
     variant="dialog"
+    className={kind === 'payments' ? 'tenant-submit-payment-overlay' : kind === 'maintenance' ? 'tenant-submit-maintenance-overlay' : ''}
   >
     <div className="tenant-form-panel tenant-form-panel--bare">
       <form onSubmit={submit} className="tenant-modal-form">
@@ -176,7 +180,7 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
                 required
               />
             </label>
-            <label>
+            {method === 'cash' ? <><label><span>Cash handed to</span><TenantDropdown name="cash_recipient" value={cashRecipient} onChange={setCashRecipient} options={[{ value: 'admin', label: 'Admin' }, { value: 'caretaker', label: 'Caretaker' }]} placeholder="Select recipient" required /></label><p className="tenant-section-label">Submit after handing over the cash. Payment stays under review until the admin confirms receipt.</p></> : <>            <label>
               <span>Reference number</span>
               <input
                 name="reference_number"
@@ -193,9 +197,10 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
                 accept="image/jpeg,image/png,application/pdf"
                 required
                 title="Choose receipt file"
-                subtitle="JPG, PNG or PDF up to 2MB"
+                subtitle="Images optimized automatically · PDF up to 2 MB"
               />
             </label>
+</>}
             <button className="button button--primary" type="submit" disabled={busy}>
               {busy ? 'Submitting…' : 'Submit for verification'}
             </button>
@@ -235,7 +240,7 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
                 name="file"
                 accept="image/jpeg,image/png,application/pdf"
                 title="Choose photo or document"
-                subtitle="JPG, PNG or PDF up to 2MB"
+                subtitle="Images optimized automatically · PDF up to 2 MB"
               />
             </label>
             <button className="button button--primary" type="submit" disabled={busy}>
@@ -343,10 +348,12 @@ export function TenantWorkspace({ kind }: { kind: Kind }) {
         {loading && !rows.length ? <DataSkeleton label="Loading payment history" /> : rows.length ? <div className="tenant-payment-history__items">{rows.map(row => { const billed = invoices.find(item => item.id === row.invoice_id); return <button type="button" className={`tenant-payment-history__item${selected?.id === row.id ? ' is-selected' : ''}`} key={String(row.id)} onClick={() => setSelected(row)}><span><strong>{billed ? paymentMonth(billed.coverage_start) : `Submitted ${paymentDate(row.created_at)}`}</strong><small>{paymentAmount(row.amount,billed?.currency)}</small></span><span className={`tenant-payment-status tenant-payment-status--${String(row.status)}`}>{paymentStatus(row.status)}</span></button>; })}</div> : <EmptyState title="No payments to display" description="Your payment submissions will appear here." icon="receipt" />}
         {count > 25 && <div className="operational-pagination"><button type="button" disabled={page===1} onClick={() => setPage(page-1)}>Previous</button><span>{page} / {Math.ceil(count/25)}</span><button type="button" disabled={page*25>=count} onClick={() => setPage(page+1)}>Next</button></div>}
       </section>
-      <section className="tenant-payment-details" aria-labelledby="payment-details-title"><h2 id="payment-details-title">Payment Details</h2>{selected ? <div className="tenant-payment-details__body"><button type="button" className="tenant-payment-details__close" onClick={() => setSelected(null)} aria-label="Close payment details">×</button><h3>Payment Information</h3><dl>
+      <MobileDetailSurface open={Boolean(selected)} onClose={() => setSelected(null)} title="Payment Details">
+      <section className="tenant-payment-details" aria-labelledby="payment-details-title"><h2 id="payment-details-title">Payment Details</h2>{selected ? <div className="tenant-payment-details__body"><button type="button" className="tenant-payment-details__close" onClick={() => setSelected(null)} aria-label="Close payment details"><CloseIcon /></button><h3>Payment Information</h3><dl>
         <div><dt>Amount</dt><dd>{paymentAmount(selected.amount,selectedInvoice?.currency)}</dd></div><div><dt>Billing Period</dt><dd>{paymentMonth(selectedInvoice?.coverage_start)}</dd></div><div><dt>Payment Method</dt><dd>{pretty(selected.method)}</dd></div><div><dt>Reference Number</dt><dd>{pretty(selected.reference_number)}</dd></div><div><dt>Payment Date</dt><dd>{paymentDate(selected.created_at)}</dd></div>
-      </dl><h3>Proof of Payment</h3>{selected.attachment_id ? <a className="tenant-payment-proof" href={`/api/attachments?id=${encodeURIComponent(String(selected.attachment_id))}`}><Icon name="receipt" />View uploaded proof</a> : <p className="tenant-payment-proof">No proof attached</p>}
+      </dl><h3>Proof of Payment</h3>{selected.attachment_id ? <PaymentProofViewer key={String(selected.attachment_id)} attachmentId={String(selected.attachment_id)} /> : <p className="tenant-payment-proof">No proof attached</p>}
       <div className={`tenant-payment-verification tenant-payment-verification--${String(selected.status)}`}><strong>{paymentStatus(selected.status)}</strong><p>{selected.status === 'approved' ? 'This payment has been confirmed by the admin.' : selected.status === 'pending' ? 'This payment is awaiting admin review.' : 'This payment was not approved.'}</p>{Boolean(selected.review_note) && <p>{pretty(selected.review_note)}</p>}</div></div> : <EmptyState title="No Payment Selected" description="Select a payment record to view details and review payment proof." icon="fileSearch" />}</section>
+      </MobileDetailSurface>
     </div> : <div className="tenant-record-layout">
       <Panel title={item.section} description="Updates about your submissions." icon={kind === 'maintenance' ? 'wrench' : 'sparkles'}>
         <div className="tenant-filter-row" role="group" aria-label={`${item.section} filters`}>{item.filters.map(value => <button key={value} type="button" className={`tenant-filter${filter === value ? ' is-active' : ''}`} aria-pressed={filter === value}
@@ -357,12 +364,14 @@ export function TenantWorkspace({ kind }: { kind: Kind }) {
         </button>)}</div> : <EmptyState title="No records to display" description="Your submissions will appear here when available." icon={kind === 'maintenance' ? 'wrench' : 'sparkles'} />}
         {count > 25 && <div className="operational-pagination"><button type="button" disabled={page === 1} onClick={() => setPage(page-1)}>Previous</button><span>{page} / {Math.ceil(count/25)}</span><button type="button" disabled={page*25 >= count} onClick={() => setPage(page+1)}>Next</button></div>}
       </Panel>
+      <MobileDetailSurface open={kind === 'maintenance' && Boolean(selected)} onClose={() => setSelected(null)} title="Maintenance Details">
       <Panel title="Submission Details" description="Select a record to view its details." icon="fileSearch" className="tenant-detail-panel">
-        {selected ? <dl className="tenant-selected-details">{Object.entries(selected).filter(([key]) => !['id','tenant_id','request_key','invoice_id','room_id'].includes(key)).map(([key,value]) =>
+        {selected && kind === 'maintenance' ? <MaintenanceSubmissionDetails record={selected} /> : selected ? <dl className="tenant-selected-details">{Object.entries(selected).filter(([key]) => !['id','tenant_id','request_key','invoice_id','room_id'].includes(key)).map(([key,value]) =>
           <div key={key}><dt>{key.replaceAll('_',' ')}</dt><dd>{pretty(value)}</dd></div>)}
           {Boolean(selected.attachment_id) && <div><dt>Attachment</dt><dd><a href={`/api/attachments?id=${selected.attachment_id}`}>Download file</a></dd></div>}</dl>
           : <EmptyState title="No item selected" description="Details will appear here when a record is available." icon="fileSearch" />}
       </Panel>
+      </MobileDetailSurface>
     </div>}
     {kind === 'payments' && <p className="tenant-privacy-note">Payment submissions and receipts are private to your account.</p>}
   </div>;

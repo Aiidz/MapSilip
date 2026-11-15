@@ -1,5 +1,8 @@
 'use client';
 
+import { uploadAttachment } from '../lib/uploads/client';
+import { CloseIcon } from "./CloseIcon";
+
 import { DataSkeleton } from './DataSkeleton';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -176,12 +179,7 @@ export function OperationalWorkspace({ title, description, resources, role, init
         const file = form.querySelector<HTMLInputElement>('input[name="file"]')?.files?.[0];
         if (action === 'payment.submit' && !file) throw new Error('Select a payment proof.');
         if (file) {
-          const payload = new FormData(); payload.set('file', file);
-          payload.set('purpose', action === 'payment.submit' ? 'payment' : 'maintenance');
-          const upload = await fetch('/api/attachments', { method: 'POST', body: payload });
-          const uploadResult = await upload.json();
-          if (!upload.ok) throw new Error(uploadResult.message || 'The file could not be uploaded.');
-          data.attachment_id = uploadResult.id;
+          data.attachment_id = await uploadAttachment(file, action === 'payment.submit' ? 'payment' : 'maintenance');
         }
         delete data.file;
       }
@@ -311,7 +309,7 @@ export function OperationalWorkspace({ title, description, resources, role, init
     <dialog ref={tenantDialog} className="tenant-directory__dialog" aria-labelledby="tenant-directory-title" onCancel={event => { if (busy) event.preventDefault(); }} onClose={() => { setSelectedTenant(null); setTenantAction(null); }}>
       {selectedTenant && <div className="tenant-directory__dialog-inner">
         <header><div><h2 id="tenant-directory-title">{String(selectedTenant.display_name)}</h2><p>{selectedTenant.room_number ? `Room ${selectedTenant.room_number}` : 'No room assigned'} · {String(selectedTenant.status)}</p></div>
-          <button type="button" aria-label="Close tenant details" disabled={busy} onClick={() => tenantDialog.current?.close()}>×</button></header>
+          <button type="button" aria-label="Close tenant details" disabled={busy} onClick={() => tenantDialog.current?.close()}><CloseIcon /></button></header>
         <div className="tenant-directory__dialog-body">{tenantActionMessage && <p role="alert" className="tenant-directory__error">{tenantActionMessage}</p>}<div className="tenant-directory__identity"><span className="tenant-directory__portrait" aria-hidden="true"><span>{String(selectedTenant.display_name || '?').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span></span><div><strong>{String(selectedTenant.display_name)}</strong><small>{selectedTenant.room_number ? `Room ${selectedTenant.room_number}` : 'Room assignment needed'}</small></div></div>
           <dl className="tenant-directory__details"><div><dt>Email</dt><dd>{display(selectedTenant.email,'email',references)}</dd></div><div><dt>Phone</dt><dd>{display(selectedTenant.phone,'phone',references)}</dd></div><div><dt>Emergency contact</dt><dd>{display(selectedTenant.emergency_contact,'emergency_contact',references)}</dd></div><div><dt>Status</dt><dd>{display(selectedTenant.status,'status',references)}</dd></div><div><dt>Room</dt><dd>{selectedTenant.room_number ? `${selectedTenant.room_number} · ${selectedTenant.floor_label}` : 'Unassigned'}</dd></div><div><dt>Assigned on</dt><dd>{display(selectedTenant.started_on,'started_on',references)}</dd></div></dl>
           {tenantAction === 'move' ? <form className="operational-form tenant-directory__action-form" onSubmit={submitTenantAction}><h3>{selectedTenant.room_id ? 'Move tenant' : 'Assign room'}</h3><label>Available room<select name="room_id" required defaultValue=""><option value="" disabled>Select room</option>{references.roomRecords.filter(room => room.availability === 'available' && room.id !== selectedTenant.room_id).map(room => <option key={String(room.id)} value={String(room.id)}>{String(room.room_number)} · {String(room.floor_label)}</option>)}</select></label><label>Effective date<input name="started_on" type="date" value={manilaToday()} readOnly /></label>{!references.roomRecords.some(room => room.availability === 'available' && room.id !== selectedTenant.room_id) && <p>No other available room records were loaded.</p>}{Boolean(selectedTenant.room_id && String(selectedTenant.started_on) >= manilaToday()) && <p>This tenant was assigned today. A move can be recorded tomorrow so the room history stays accurate.</p>}<div className="tenant-directory__action-buttons"><button className="button button--primary" type="submit" disabled={busy || !references.roomRecords.some(room => room.availability === 'available' && room.id !== selectedTenant.room_id) || Boolean(selectedTenant.room_id && String(selectedTenant.started_on) >= manilaToday())}>{busy ? 'Saving…' : 'Save assignment'}</button><button type="button" onClick={() => setTenantAction(null)}>Cancel</button></div></form>

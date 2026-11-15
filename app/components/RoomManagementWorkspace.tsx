@@ -1,12 +1,17 @@
 'use client';
 
+import { CloseIcon } from "./CloseIcon";
+
 import { DataSkeleton } from './DataSkeleton';
+import { MapLoading } from './MapLoading';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { ProfilePhoto } from './ProfilePhoto';
 import { Icon } from './Icon';
+import { MobileDetailSurface } from './MobileDetailSurface';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
 import dynamic from 'next/dynamic';
-const BuildingMapWorkspace = dynamic(() => import('./BuildingMapWorkspace').then(module => module.BuildingMapWorkspace), { loading: () => <DataSkeleton label="Loading dormitory view" variant="chart" /> });
+const BuildingMapWorkspace = dynamic(() => import('./BuildingMapWorkspace').then(module => module.BuildingMapWorkspace), { loading: () => <MapLoading /> });
 import { PageHeader } from './ui';
 import type { BuildingRoom } from '../lib/building-map.mjs';
 
@@ -59,7 +64,7 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
   const [loading,setLoading] = useState(true);
   const load = useCallback(async () => {
     try { const [roomList,tenantList,assignmentList] = await Promise.all([allRows('rooms'),allTenantRows(),allRows('assignments')]);
-      setRooms(roomList);setTenants(tenantList);setAssignments(assignmentList);setMessage(''); }
+      setRooms(roomList);setSelected(current => current?.id ? roomList.find(room => room.id === current.id) ?? current : current);setTenants(tenantList);setAssignments(assignmentList);setMessage(''); }
     catch { setMessage('Room records could not be loaded.'); }
     finally { setLoading(false); }
   },[]);
@@ -134,7 +139,7 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
     setBusy(true);
     try {
       if (form === 'room') await operate(selected?.id ? 'room.update' : 'room.create',{
-        ...data,...(selected?.id ? { id:selected.id } : {}) });
+        ...data,...(selected?.id ? { id:selected.id, floor_label:selected.floor_label } : {}) });
       else await operate('room.assign',{ ...data,tenant_id:selected?.user_id });
       setForm(null);setMessage('Saved successfully.');await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'The change could not be saved.'); }
@@ -181,30 +186,30 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
       </div>
         <label className="tenant-list-search"><Icon name="search" /><input aria-label={filter==='rooms'?'Search rooms':'Search tenants'} placeholder={filter==='rooms'?'Search room...':'Search tenant...'} value={search} onChange={event => setSearch(event.target.value)} /></label>
         {loading && !rooms.length && !tenants.length ? <DataSkeleton /> : (filter==='rooms' ? roomResults : people).length ? <div className="room-list-records">{(filter==='rooms' ? roomResults : people).map(row => <button type="button" key={String(row.id || row.user_id)} className="room-list-record" onClick={() => { if (filter==='rooms') { tenantSelection.current += 1;setSelected(row);setForm(null); } else void selectTenant(row); }}>
-          <span className="room-list-avatar">{String((filter==='rooms' ? row.room_number : row.display_name) || '?').slice(0,1).toUpperCase()}</span><span><strong>{value(filter==='rooms' ? row.room_number : row.display_name)}</strong><small>{filter==='rooms' ? `${row.floor_label} · ${row.capacity} slots` : slotOf(row.user_id) ? `Slot ${slotOf(row.user_id)}${row.tenant_code ? ` · ${row.tenant_code}` : ''}` : 'Awaiting room assignment'}</small></span>
+          {filter === 'rooms' ? <span className="room-list-avatar">{String((filter==='rooms' ? row.room_number : row.display_name) || '?').slice(0,1).toUpperCase()}</span> : <ProfilePhoto key={String(row.user_id ?? row.id)} className="room-list-avatar" userId={filter === 'rooms' ? undefined : String(row.user_id)} fallback={String((filter==='rooms' ? row.room_number : row.display_name) || '?').slice(0,1).toUpperCase()} />}<span><strong>{value(filter==='rooms' ? row.room_number : row.display_name)}</strong><small>{filter==='rooms' ? `${row.floor_label} · ${row.capacity} slots` : slotOf(row.user_id) ? `Slot ${slotOf(row.user_id)}${row.tenant_code ? ` · ${row.tenant_code}` : ''}` : 'Awaiting room assignment'}</small></span>
         </button>)}</div> : <p className="tenant-list-empty">No records to display.</p>}
       </aside>
-      <section className="tenant-details-panel" aria-labelledby="tenant-details-title"><h2 id="tenant-details-title">{filter==='rooms'?'Room Details':'Tenant Details'}</h2>
+      <MobileDetailSurface open={Boolean(selected)} onClose={() => { tenantSelection.current += 1; setSelected(null); }} title={filter === 'rooms' ? 'Room Details' : 'Tenant Details'}><section className="tenant-details-panel" aria-labelledby="tenant-details-title"><h2 id="tenant-details-title">{filter==='rooms'?'Room Details':'Tenant Details'}</h2>
         {selected ? <div className="room-selected-details">
           {filter==='rooms' ? <><h3>Room {value(selected.room_number)}</h3><p>Floor: {value(selected.floor_label)}</p><p>Capacity: {value(selected.capacity)}</p><p>Availability: {value(selected.availability)}</p><p>Occupants: {occupied.filter(row => row.room_id === selected.id).length}</p>
             <button className="button button--secondary" type="button" onClick={() => setForm('room')}>Edit room</button></>
             : <div className="room-tenant-detail">
-              <div className="room-tenant-detail__identity"><span className="room-list-avatar" aria-hidden="true">{String(selected.display_name || '?').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span><div><strong>{value(selected.display_name)}</strong><small>{value(selected.email)}</small></div><button type="button" aria-label="Close tenant details" onClick={() => { tenantSelection.current += 1;setSelected(null); }}>×</button></div>
+              <div className="room-tenant-detail__identity"><ProfilePhoto key={String(selected.user_id)} className="room-list-avatar" userId={String(selected.user_id)} fallback={String(selected.display_name || '?').slice(0,1)} /><div><strong>{value(selected.display_name)}</strong><small>{value(selected.email)}</small></div><button type="button" aria-label="Close tenant details" onClick={() => { tenantSelection.current += 1;setSelected(null); }}><CloseIcon /></button></div>
               {tenantHistory.error && <p role="alert" className="room-tenant-detail__error">{tenantHistory.error}</p>}
               <div className="room-tenant-detail__grid">
                 <section className="room-tenant-detail__tile"><h3>Personal Information</h3><dl>
                   <div><dt>Full Name</dt><dd>{value(selected.display_name)}</dd></div><div><dt>Contact Number</dt><dd>{value(selected.phone)}</dd></div><div><dt>Email Address</dt><dd>{value(selected.email)}</dd></div><div><dt>Home Address</dt><dd>{value(selected.home_address)}</dd></div><div><dt>Tenant ID</dt><dd>{value(selected.tenant_code)}</dd></div>
                 </dl><hr /><h4>Emergency Contact</h4><dl><div><dt>Contact Details</dt><dd>{value(selected.emergency_contact)}</dd></div></dl></section>
                 <section className="room-tenant-detail__tile"><h3>Contract Details</h3><dl>
-                  <div><dt>Room Assignment</dt><dd>{selectedRoom ? `Room ${value(selectedRoom.room_number)}` : 'Unassigned'}</dd></div><div><dt>Contract Start Date</dt><dd>{value(selectedAssignment?.started_on)}</dd></div><div><dt>Contract End Date</dt><dd>Not recorded</dd></div><div><dt>Monthly Rent</dt><dd>₱3,000</dd></div><div><dt>Contract Status</dt><dd>{value(selected.status)}</dd></div>
-                </dl><div className="room-tenant-detail__document"><Icon name="fileSearch" /><span>Rental contract not linked</span></div></section>
+                  <div><dt>Room Assignment</dt><dd>{selectedRoom ? `Room ${value(selectedRoom.room_number)}` : 'Unassigned'}</dd></div><div><dt>Contract Start Date</dt><dd>{value(selectedAssignment?.started_on)}</dd></div><div><dt>Contract End Date</dt><dd>{value(selectedAssignment?.contract_end_on)}</dd></div><div><dt>Monthly Rent</dt><dd>{(selectedAssignment?.contract_monthly_rent ?? selectedRoom?.monthly_rent) == null ? 'Not set' : formatPhp(selectedAssignment?.contract_monthly_rent ?? selectedRoom?.monthly_rent)}</dd></div><div><dt>Contract Status</dt><dd>{value(selected.status)}</dd></div>
+                </dl><div className="room-tenant-detail__document"><Icon name="fileSearch" />{selectedAssignment?.contract_attachment_id ? <a href={`/api/attachments?id=${encodeURIComponent(String(selectedAssignment.contract_attachment_id))}`}>View rental contract</a> : <span>Rental contract not linked</span>}</div></section>
                 <section className="room-tenant-detail__tile"><h3>Payment History</h3>{tenantHistory.loading ? <DataSkeleton label="Loading payment history" variant="table" count={2} /> : tenantHistory.error ? <p className="room-tenant-detail__empty">Payment history is unavailable.</p> : tenantHistory.payments.length ? <div className="room-tenant-detail__table-wrap"><table><thead><tr><th>Month</th><th>Amount</th><th>Status</th></tr></thead><tbody>{tenantHistory.payments.slice(0,3).map(payment => <tr key={String(payment.id)}><td>{formatMonth(payment.created_at)}</td><td>{formatPhp(payment.amount)}</td><td><span className={`room-tenant-detail__payment-status room-tenant-detail__payment-status--${String(payment.status)}`}>{paymentStatus(payment.status)}</span></td></tr>)}</tbody></table></div> : <p className="room-tenant-detail__empty">No payment records to display.</p>}<a className="room-tenant-detail__view-all" href={`/management/payments?search=${encodeURIComponent(String(selected.display_name ?? ''))}`}>View All Records</a></section>
                 <section className="room-tenant-detail__tile"><h3>Concerns &amp; Suggestions</h3>{tenantHistory.loading ? <DataSkeleton label="Loading concerns" variant="details" count={2} /> : tenantHistory.error ? <p className="room-tenant-detail__empty">Concern history is unavailable.</p> : <div className="room-tenant-detail__stats"><div><strong>{tenantHistory.concerns.length}</strong><span>Total submissions</span></div><div><strong>{tenantHistory.concerns.filter(concern => concern.status !== 'resolved').length}</strong><span>Unresolved</span></div></div>}<a className="room-tenant-detail__view-all" href={`/management/concerns?tenant=${encodeURIComponent(String(selected.user_id))}`}>View All Records</a></section>
               </div>
               <div className="room-tenant-detail__actions"><button className={`button ${selectedAssignment ? 'button--primary' : 'button--secondary'}`} type="button" onClick={() => setForm('assignment')}>{selectedAssignment?'Move tenant':'Assign room'}</button></div>
             </div>}
         </div> : <div className="room-details-empty"><span className="room-details-empty__icon"><Icon name="fileSearch" /></span><strong>{filter==='rooms'?'No Room Selected':'No Tenant Selected'}</strong><p>Select a record from the list to view its details.</p></div>}
-      </section>
+      </section></MobileDetailSurface>
     </section>
     <ResponsiveOverlay
       open={form === 'room' && Boolean(selected)}
@@ -215,10 +220,9 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
     >
       {selected && <form key={String(selected.id)} className="operational-form room-detail-form" onSubmit={save}>
         <label>Room number<input name="room_number" defaultValue={value(selected.room_number).replace('—','')} maxLength={32} required /></label>
-        <label>Floor<input name="floor_label" defaultValue={value(selected.floor_label).replace('—','')} maxLength={40} required /></label>
         <label>Capacity<input name="capacity" type="number" min={1} max={100} defaultValue={Number(selected.capacity || 1)} required /></label>
-        <label>Availability<select name="availability" defaultValue={String(selected.availability)}><option value="available">Available</option><option value="reserved">Reserved</option><option value="maintenance">Maintenance</option></select></label>
-        <div className="ps-overlay__actions"><button className="button button--primary" disabled={busy}>{busy?'Saving…':'Save changes'}</button><button type="button" className="button button--secondary" onClick={() => setForm(null)}>Cancel</button></div>
+        <label>Monthly rent per tenant (₱)<input name="monthly_rent" type="number" min="0.01" step="0.01" defaultValue={selected.monthly_rent == null ? '' : Number(selected.monthly_rent)} /></label><label>Room policy<select name="gender_policy" defaultValue={String(selected.gender_policy || 'any')}><option value="any">Unrestricted</option><option value="male">Boys only</option><option value="female">Girls only</option></select></label><label>Availability<select name="availability" defaultValue={String(selected.availability)}><option value="available">Available</option><option value="reserved">Reserved</option><option value="maintenance">Maintenance</option></select></label>
+        <div className="ps-overlay__actions room-edit-actions"><button type="button" className="button button--secondary" disabled={busy} onClick={() => setForm(null)}>Cancel</button><button type="submit" className="button button--primary" disabled={busy}>{busy?'Saving…':'Save changes'}</button></div>
       </form>}
     </ResponsiveOverlay>
     <ResponsiveOverlay
@@ -231,7 +235,7 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
       {selected && <form key={String(selected.user_id)} className="tenant-move-flow tenant-move-flow--overlay" onSubmit={save}>
         <p className="tenant-move-flow__intro">{selectedAssignment ? `Choose a new room for ${value(selected.display_name)}.` : `Choose a room for ${value(selected.display_name)}.`}</p>
         <div className="tenant-move-flow__layout">
-          <section className="tenant-move-flow__current"><h3>Tenant</h3><div className="tenant-move-flow__resident"><span className="room-list-avatar" aria-hidden="true">{String(selected.display_name || '?').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span><div><strong>{value(selected.display_name)}</strong><small>{value(selected.email)}</small></div></div><dl><div><dt>Current Room</dt><dd>{selectedRoom ? `Room ${value(selectedRoom.room_number)}` : 'No room assigned'}</dd></div><div><dt>Floor</dt><dd>{value(selectedRoom?.floor_label)}</dd></div>{selectedAssignment && <div><dt>Current Slot</dt><dd>{slotOf(selected.user_id) ? `Slot ${slotOf(selected.user_id)}` : '—'}</dd></div>}</dl></section>
+          <section className="tenant-move-flow__current"><h3>Tenant</h3><div className="tenant-move-flow__resident"><ProfilePhoto key={String(selected.user_id)} className="room-list-avatar" userId={String(selected.user_id)} fallback={String(selected.display_name || '?').slice(0,1)} /><div><strong>{value(selected.display_name)}</strong><small>{value(selected.email)}</small></div></div><dl><div><dt>Current Room</dt><dd>{selectedRoom ? `Room ${value(selectedRoom.room_number)}` : 'No room assigned'}</dd></div><div><dt>Floor</dt><dd>{value(selectedRoom?.floor_label)}</dd></div>{selectedAssignment && <div><dt>Current Slot</dt><dd>{slotOf(selected.user_id) ? `Slot ${slotOf(selected.user_id)}` : '—'}</dd></div>}</dl></section>
           <section className="tenant-move-flow__destination"><label className="tenant-move-flow__search">Search rooms<input type="search" value={moveSearch} onChange={event => setMoveSearch(event.target.value)} placeholder="Search room or floor" /></label><div className="tenant-move-flow__list-head"><h3>Available Rooms</h3><span>{moveTargets.length} {moveTargets.length === 1 ? 'room' : 'rooms'}</span></div><div className="tenant-move-flow__rooms">{moveTargets.length ? moveTargets.map(room => <label className="tenant-move-flow__room" key={String(room.id)}><input type="radio" name="room_id" value={String(room.id)} required /><span><strong>Room {value(room.room_number)}</strong><small>{value(room.floor_label)} · {value(room.capacity)} slots</small></span><span className="tenant-move-flow__available">Available</span></label>) : <p className="tenant-move-flow__empty">{moveSearch ? 'No available rooms match your search.' : 'No available rooms to assign.'}</p>}</div></section>
         </div>
         <div className="tenant-move-flow__footer"><label>Start date<input name="started_on" type="date" required /></label><div><button className="button button--secondary" type="button" onClick={() => setForm(null)}>Cancel</button><button className="button button--primary" disabled={busy || moveTargets.length === 0}>{busy ? 'Saving…' : selectedAssignment ? 'Confirm Move' : 'Confirm Assignment'}</button></div></div>

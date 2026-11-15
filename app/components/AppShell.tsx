@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { isNavigationItemActive } from "../lib/navigation.mjs";
 import { PwaManager } from "./PwaManager";
 import { SidebarProfileCard } from "./SidebarProfileCard";
@@ -53,7 +53,7 @@ const managementMobileNavigation = [
   "/management/more",
 ];
 
-function Brand({ area }: { area: Area }) {
+function Brand({ area, desktop = false }: { area: Area; desktop?: boolean }) {
   return (
     <Link
       className="brand"
@@ -76,10 +76,10 @@ function Brand({ area }: { area: Area }) {
         height="419"
         unoptimized
       />
-      <span className="brand__text">
+      {!desktop && <span className="brand__text">
         <strong>MapSilip</strong>
         <small>Dormitory living, made simpler</small>
-      </span>
+      </span>}
     </Link>
   );
 }
@@ -91,8 +91,36 @@ function TenantToolbar({ authEnabled }: { authEnabled: boolean }) {
   </div>;
 }
 
-function NavLinks({ area, mobile = false }: { area: Area; mobile?: boolean }) {
+function NavLinks({ area, mobile = false, collapsed = false }: { area: Area; mobile?: boolean; collapsed?: boolean }) {
   const pathname = usePathname();
+  const navRef = useRef<HTMLElement>(null);
+  const highlightRef = useRef<HTMLSpanElement>(null);
+  const lastPosition = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const highlight = highlightRef.current;
+    if (!nav || !highlight) return;
+    let animation: Animation | undefined;
+    function place(animate: boolean) {
+      const active = nav!.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!active) { highlight!.style.opacity = '0'; lastPosition.current = null; return; }
+      const next = { x: active.offsetLeft, y: active.offsetTop, width: active.offsetWidth, height: active.offsetHeight };
+      const previous = lastPosition.current;
+      animation?.cancel();
+      Object.assign(highlight!.style, { left: `${next.x}px`, top: `${next.y}px`, width: `${next.width}px`, height: `${next.height}px`, opacity: '1', backgroundColor: getComputedStyle(active).backgroundColor, borderRadius: getComputedStyle(active).borderRadius });
+      if (animate && previous && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        animation = highlight!.animate([
+          { transform: `translate(${previous.x-next.x}px, ${previous.y-next.y}px) scale(${previous.width/next.width}, ${previous.height/next.height})` },
+          { transform: 'none' },
+        ], { duration: 380, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+      }
+      lastPosition.current = next;
+    }
+    place(true);
+    const observer = new ResizeObserver(() => place(false));
+    observer.observe(nav);
+    return () => { observer.disconnect(); animation?.cancel(); };
+  }, [pathname, collapsed, mobile]);
   const items = mobile && area === "caretaker"
     ? navigation.caretaker
     : mobile && area === "tenant"
@@ -106,11 +134,14 @@ function NavLinks({ area, mobile = false }: { area: Area; mobile?: boolean }) {
     : navigation[area].filter((item) => item.label !== "More");
   return (
     <nav
+      ref={navRef}
       className={mobile ? "mobile-nav" : "side-nav"}
+      id={mobile ? undefined : "desktop-primary-navigation"}
       aria-label={mobile
         ? "Primary navigation"
         : `${area === "tenant" ? "Tenant" : area === "caretaker" ? "Caretaker" : "Management"} navigation`}
     >
+      <span ref={highlightRef} className="nav-active-highlight" aria-hidden="true" />
       {items.map((item) => {
         const active = isNavigationItemActive(pathname, item.href, item.exact);
         return (
@@ -119,6 +150,7 @@ function NavLinks({ area, mobile = false }: { area: Area; mobile?: boolean }) {
             href={item.href}
             className={`nav-link${active ? " nav-link--active" : ""}`}
             aria-current={active ? "page" : undefined}
+            title={collapsed ? item.label : undefined}
           >
             <Icon name={item.icon} />
             <span>{mobile ? item.mobileLabel ?? item.label : item.label}</span>
@@ -126,6 +158,57 @@ function NavLinks({ area, mobile = false }: { area: Area; mobile?: boolean }) {
         );
       })}
     </nav>
+  );
+}
+
+function DesktopSidebar({ area }: { area: Area }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const lastDragTime = useRef<number | null>(null);
+  const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || (event.target instanceof Element && event.target.closest('a,button,input,textarea,select,[role="button"]'))) return;
+    dragStart.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const handlePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
+    const start = dragStart.current;
+    dragStart.current = null;
+    if (!start) return;
+    const deltaX = event.clientX - start.x;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(event.clientY - start.y)) return;
+    if ((deltaX < 0 && !collapsed) || (deltaX > 0 && collapsed)) {
+      lastDragTime.current = event.timeStamp;
+      setCollapsed(deltaX < 0);
+    }
+  };
+  const handleBackgroundClick = (event: ReactMouseEvent<HTMLElement>) => {
+    if (lastDragTime.current !== null && event.timeStamp - lastDragTime.current < 80) {
+      lastDragTime.current = null;
+      return;
+    }
+    lastDragTime.current = null;
+    const target = event.target;
+    if (target instanceof Element && target.closest('a,button,input,textarea,select,[role="button"]')) return;
+    if (target === event.currentTarget || (target instanceof Element && target.closest('.side-nav,.sidebar-caption,.sidebar-brand-row'))) {
+      setCollapsed(value => !value);
+    }
+  };
+  return (
+    <aside
+      className="desktop-sidebar"
+      data-sidebar-collapsed={collapsed}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => { dragStart.current = null; }}
+      onClick={handleBackgroundClick}
+    >
+      <div className="sidebar-brand-row">
+        <Brand area={area} desktop />
+      </div>
+      <div className="sidebar-caption">MENU</div>
+      <NavLinks area={area} collapsed={collapsed} />
+      <SidebarProfileCard area={area} />
+    </aside>
   );
 }
 
@@ -138,8 +221,12 @@ function PortalPageContent({ pathname, children }: { pathname: string; children:
     previousPath.current = pathname;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     // Keep the page mounted and fixed sheets anchored to the viewport.
-    const animation = element.current?.animate?.([{ opacity: .92 }, { opacity: 1 }], {
-      duration: 320, easing: 'cubic-bezier(.22, .61, .36, 1)',
+    const node = element.current;
+    if (!node) return;
+    const motion = typeof getComputedStyle === 'function' ? getComputedStyle(node) : null;
+    const animation = node.animate?.([{ opacity: 0 }, { opacity: 1 }], {
+      duration: Number.parseFloat(motion?.getPropertyValue('--motion-overlay') || '440') || 440,
+      easing: motion?.getPropertyValue('--motion-ease').trim() || 'cubic-bezier(.22, .61, .36, 1)',
     });
     return () => animation?.cancel();
   }, [pathname]);
@@ -166,14 +253,7 @@ export function AppShell(
         </div>
       </header>
 
-      <aside className="desktop-sidebar">
-        <Brand area={area} />
-        <div className="sidebar-caption">
-          MENU
-        </div>
-        <NavLinks area={area} />
-        <SidebarProfileCard area={area} />
-      </aside>
+      <DesktopSidebar area={area} />
 
       <main className="main-content" id="main-content" tabIndex={-1}>
         {isTenant && <TenantToolbar authEnabled={tenantAuthEnabled} />}

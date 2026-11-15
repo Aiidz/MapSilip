@@ -158,9 +158,13 @@ export function createSecurityExecutor(pool: PoolLike) {
         [attemptId, userId, sessionId, passwordUpdateConfirmed, globalRevocationConfirmed]),
     reconcileFirstLogin: (attemptId: string, userId: string, sessionId: string) =>
       jsonCommand('select mapsilip_private.reconcile_first_login($1, $2, $3) as result', [attemptId, userId, sessionId]),
-    submitAccountRequest: (email: string, name: string, phone: string | null, userId?: string | null) =>
-      execute(pool, 'select mapsilip_private.submit_account_request($1, $2, $3, $4) as result',
-        [email, name, phone, userId || null], value => {
+    applicantRoomCatalog: () => execute(pool, 'select mapsilip_private.applicant_room_catalog() as result', [], value => {
+      if (!Array.isArray(value)) throw new BackendError('unavailable');
+      return value as Record<string, unknown>[];
+    }),
+    submitAccountRequest: (email: string, name: string, phone: string | null, userId?: string | null, gender?: string, preferredRoomId?: string | null) =>
+      execute(pool, preferredRoomId ? 'select mapsilip_private.submit_account_request($1, $2, $3, $4, $5, $6) as result' : 'select mapsilip_private.submit_account_request($1, $2, $3, $4, $5) as result',
+        preferredRoomId ? [email, name, phone, userId || null, gender || null, preferredRoomId] : [email, name, phone, userId || null, gender || null], value => {
           const row = objectValue(value);
           const id = row?.id;
           if (row?.state !== 'received' || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) {

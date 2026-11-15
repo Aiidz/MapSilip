@@ -1,5 +1,8 @@
 'use client';
 
+import { ProfilePhoto } from './ProfilePhoto';
+import { CloseIcon } from "./CloseIcon";
+
 import { DataSkeleton } from './DataSkeleton';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -90,8 +93,10 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
   async function review(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!selected || busy) return;
     const form = new FormData(event.currentTarget);
+    const decision = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    if (selected.method === 'cash' && decision?.value === 'approved' && form.get('cash_received') !== 'on') { setMessage('Confirm the admin received the cash before approval.'); return; }
     setBusy(true);
-    try { await mutate('payment.review',{ id:selected.id,status:(event.nativeEvent as SubmitEvent).submitter instanceof HTMLButtonElement ? ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement).value : form.get('status'),note:form.get('note') });
+    try { await mutate('payment.review',{ id:selected.id,status:(event.nativeEvent as SubmitEvent).submitter instanceof HTMLButtonElement ? ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement).value : form.get('status'),note:form.get('note'),cash_received:form.get('cash_received') === 'on' });
       setSelected(null); setMessage('Payment review saved.'); await Promise.all([load(), loadSummary()]); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Review failed.'); }
     finally { setBusy(false); }
@@ -128,15 +133,15 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
     </div>
       <section className="payment-table-panel" aria-label="Payment submissions"><div className="payment-table-scroll"><table className="payment-table"><thead><tr><th scope="col">Tenant / Room</th><th scope="col">Amount</th><th scope="col">Submitted</th><th scope="col">Status</th></tr></thead>
         <tbody>{loading && !rows.length ? <tr><td colSpan={4}><DataSkeleton label="Loading payment records" variant="table" /></td></tr> : rows.length ? rows.map(row => <tr key={String(row.id)} onClick={() => { setSelected(row);setCreating(false); }} className={selected?.id === row.id ? 'is-selected' : ''}>
-          <td><button type="button" className="payment-row-select" onClick={() => { setSelected(row);setCreating(false); }}><span className="payment-tenant-avatar" aria-hidden="true">{initials(tenantName(row.tenant_id))}</span><span><strong>{tenantName(row.tenant_id)}</strong><small>Room {roomName(row.tenant_id)}</small></span></button></td>
+          <td><button type="button" className="payment-row-select" onClick={() => { setSelected(row);setCreating(false); }}><ProfilePhoto key={String(row.tenant_id)} className="payment-tenant-avatar" userId={String(row.tenant_id)} fallback={initials(tenantName(row.tenant_id))} /><span><strong>{tenantName(row.tenant_id)}</strong><small>Room {roomName(row.tenant_id)}</small></span></button></td>
           <td>{show(row.amount)} {invoiceCurrency(row.invoice_id)}</td><td>{new Date(String(row.created_at)).toLocaleDateString()}<small className="payment-submitted-time">{new Date(String(row.created_at)).toLocaleTimeString(undefined,{ hour:'numeric',minute:'2-digit' })}</small></td><td><span className={`payment-status payment-status--${row.status}`}>{row.status === 'pending' ? 'For Review' : row.status === 'approved' ? 'Verified' : 'Rejected'}</span></td>
         </tr>) : <tr><td colSpan={4}><div className="payment-empty"><span className="payment-empty__icon"><Icon name="fileSearch" /></span><strong>No payment submissions to display</strong><p>Payment records will appear here when available.</p></div></td></tr>}</tbody>
       </table></div>{count > 25 && <div className="operational-pagination"><button type="button" disabled={page===1} onClick={() => setPage(page-1)}>Previous</button><span>{page} / {Math.ceil(count/25)}</span><button type="button" disabled={page*25>=count} onClick={() => setPage(page+1)}>Next</button></div>}</section>
     </div>
     <section className="payment-details-panel" aria-labelledby="payment-details-title"><h2 id="payment-details-title">Payment Details</h2>
       {selected ? <div className="payment-selected-details">
-        <button className="payment-detail-close" type="button" aria-label="Close payment details" onClick={() => setSelected(null)}>×</button>
-        <div className="payment-detail-identity"><span className="payment-tenant-avatar" aria-hidden="true">{initials(tenantName(selected.tenant_id))}</span><div><strong>{tenantName(selected.tenant_id)}</strong><small>Room {roomName(selected.tenant_id)}</small></div><span className={`payment-status payment-status--${selected.status}`}>{statusLabel(selected.status)}</span></div>
+        <button className="payment-detail-close" type="button" aria-label="Close payment details" onClick={() => setSelected(null)}><CloseIcon /></button>
+        <div className="payment-detail-identity"><ProfilePhoto key={String(selected.tenant_id)} className="payment-tenant-avatar" userId={String(selected.tenant_id)} fallback={initials(tenantName(selected.tenant_id))} /><div><strong>{tenantName(selected.tenant_id)}</strong><small>Room {roomName(selected.tenant_id)}</small></div><span className={`payment-status payment-status--${selected.status}`}>{statusLabel(selected.status)}</span></div>
         <h3>Payment Information</h3><dl className="payment-information">
           <div><dt>Amount</dt><dd>{show(selected.amount)} {invoiceCurrency(selected.invoice_id)}</dd></div>
           <div><dt>Billing Period</dt><dd>{invoices.find(invoice => invoice.id === selected.invoice_id)?.coverage_start ? new Date(String(invoices.find(invoice => invoice.id === selected.invoice_id)?.coverage_start)).toLocaleDateString(undefined,{ month:'long',year:'numeric' }) : '—'}</dd></div>
@@ -144,8 +149,9 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
           <div><dt>Reference Number</dt><dd>{show(selected.reference_number)}</dd></div>
           <div><dt>Payment Date</dt><dd>{new Date(String(selected.created_at)).toLocaleDateString()}</dd></div>
         </dl><h3>Proof of Payment</h3>
-        {selected.attachment_id ? <a className="payment-proof" href={`/api/attachments?id=${selected.attachment_id}`}><Icon name="fileSearch" /><span>View uploaded receipt</span><small>Download payment proof</small></a> : <p>No payment proof attached.</p>}
+        {selected.attachment_id ? <a className="payment-proof" href={`/api/attachments?id=${selected.attachment_id}`}><Icon name="fileSearch" /><span>View uploaded receipt</span><small>Download payment proof</small></a> : <p>{selected.method === 'cash' ? 'Cash payment — verify receipt before approval.' : 'No payment proof attached.'}</p>}
         {selected.status === 'pending' ? <form className="operational-form payment-detail-form" onSubmit={review}>
+          {selected.method === 'cash' && <><p>Cash reported as handed to: {show(selected.cash_recipient)}. Confirm only when the admin has received the money.</p><label><input type="checkbox" name="cash_received" /> I confirm the admin received this cash payment.</label></>}
           <label>Reason if rejected<textarea name="note" rows={3} maxLength={500} /></label>
           <div className="payment-review-actions"><button className="button payment-review-reject" name="status" value="rejected" disabled={busy}>Reject</button><button className="button payment-review-confirm" name="status" value="approved" disabled={busy}>Confirm Payment</button></div>
         </form> : <div className={`payment-review-result payment-review-result--${selected.status}`}><strong>{selected.status === 'approved' ? '✓ Payment Verified' : 'ⓘ Payment Rejected'}</strong><p>{selected.status === 'approved' ? 'This payment has been confirmed by the admin.' : 'Please contact the admin regarding your payment submission.'}</p>{Boolean(selected.review_note) && <p>{show(selected.review_note)}</p>}</div>}

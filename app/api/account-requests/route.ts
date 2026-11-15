@@ -10,6 +10,7 @@ export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   let stage = 'request_origin';
+  let hasRoomPreference = false;
   try {
     assertRequestOrigin(request);
     stage = 'input_validation';
@@ -18,6 +19,11 @@ export async function POST(request: NextRequest) {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+    const gender = body.gender;
+    const preferredRoomId = body.preferred_room_id ?? null;
+    hasRoomPreference = preferredRoomId !== null;
+    if (preferredRoomId !== null && (typeof preferredRoomId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(preferredRoomId))) throw new BackendError('invalid_input');
+    if (!['male', 'female'].includes(gender)) throw new BackendError('invalid_input');
     const password = typeof body.password === 'string' ? body.password : '';
     const confirmPassword = typeof body.confirm_password === 'string' ? body.confirm_password : '';
 
@@ -41,6 +47,13 @@ export async function POST(request: NextRequest) {
     stage = 'database_preflight';
     if (!await executor.accountRequestProvisioningReady()) throw new BackendError('unavailable');
 
+    if (preferredRoomId) {
+      const rooms = await executor.applicantRoomCatalog();
+      const room = rooms.find(room => room.id === preferredRoomId);
+      if (!room || room.availability !== 'available' || Number(room.vacancies) < 1 || (room.gender_policy !== 'any' && room.gender_policy !== gender)) {
+        return NextResponse.json({ error: 'room_unavailable', message: 'That room is no longer available for your request. Choose another room.' }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
+      }
+    }
     stage = 'auth_configuration';
     const { url, publishableKey } = getSupabaseEnvironment();
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -73,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (!userId) throw new BackendError('unavailable');
 
     stage = 'request_persistence';
-    await executor.submitAccountRequest(email, name, phone || null, userId);
+    await executor.submitAccountRequest(email, name, phone || null, userId, gender, preferredRoomId);
 
     return NextResponse.json(
       {
@@ -88,7 +101,7 @@ export async function POST(request: NextRequest) {
       console.warn('[account-request]', { stage, category: safe.code });
     }
     if (stage === 'request_persistence' && safe.code === 'invalid_input') {
-      return NextResponse.json({ error: 'account_unavailable', message: 'An account or request already exists for these credentials. Try logging in, or contact dormitory management for help.' },
+      return NextResponse.json({ error: hasRoomPreference ? 'room_unavailable' : 'account_unavailable', message: 'Your request could not be completed. Check room availability or try logging in if you already submitted a request.' },
         { status: 409, headers: { 'Cache-Control': 'no-store' } });
     }
     return NextResponse.json({ error: safe.code, message: safe.message }, { status: safe.status });

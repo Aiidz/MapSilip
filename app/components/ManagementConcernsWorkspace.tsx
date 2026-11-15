@@ -1,5 +1,7 @@
 'use client';
 
+import { CloseIcon } from "./CloseIcon";
+
 import { DataSkeleton } from './DataSkeleton';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -67,7 +69,7 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
       </section>
       <Panel title="Concern Details" className="caretaker-request-details">
         {selected ? <div className="caretaker-selected-details concerns-details">
-          <button type="button" className="caretaker-details-close" aria-label="Clear selected concern" onClick={() => setSelected(null)}>×</button><h3>Concern Information</h3>
+          <button type="button" className="caretaker-details-close" aria-label="Clear selected concern" onClick={() => setSelected(null)}><CloseIcon /></button><h3>Concern Information</h3>
           <div className="caretaker-details-grid"><p><small>Category</small><strong>{label(selected.category)}</strong></p><p><small>Date Submitted</small><strong>{new Date(String(selected.created_at)).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</strong></p><p><small>Status</small><strong>{label(selected.status)}</strong></p><p><small>Resident</small><strong>Tenant submission</strong></p></div>
           <div className="caretaker-details-description-block"><span>Concern or Suggestion</span><p>{label(selected.description)}</p></div>
           {Boolean(selected.owner_response) && <div className="caretaker-details-history"><strong>Your response</strong><div><p>{label(selected.owner_response)}</p><time>{new Date(String(selected.updated_at)).toLocaleString()}</time></div></div>}

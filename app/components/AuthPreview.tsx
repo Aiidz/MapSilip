@@ -10,12 +10,14 @@ import { AccountRequestForm } from "./AccountRequestForm";
 export function AuthPreview({ request = false, firstLogin = false, recovery = false, reset = false, refineLogin = false, refineAuth = false }: {
   request?: boolean; firstLogin?: boolean; recovery?: boolean; reset?: boolean; refineLogin?: boolean; refineAuth?: boolean;
 }) {
+  const [requestStage, setRequestStage] = useState<'details' | 'rooms' | 'sent'>('details');
   const [recoverySent, setRecoverySent] = useState(false);
-  const title = request ? "Create Account" : firstLogin ? "Change Password" : recovery ? recoverySent ? "Check your email" : "Reset Password" : reset ? "Choose a New Password" : "Log In";
+  const title = request ? requestStage === "sent" ? "Request sent" : requestStage === "rooms" ? "Choose a room" : "Create Account" : firstLogin ? "Change Password" : recovery ? recoverySent ? "Check your email" : "Reset Password" : reset ? "Choose a New Password" : "Log In";
   const pageClass = [
     "auth-page",
     refineLogin ? "auth-page--login" : refineAuth ? "auth-page--refined" : "",
     request && refineAuth ? "auth-page--request" : "",
+    request && requestStage === "rooms" ? "auth-page--room-choice" : "",
   ].filter(Boolean).join(" ");
   return (
     <main className={pageClass}>
@@ -42,10 +44,10 @@ export function AuthPreview({ request = false, firstLogin = false, recovery = fa
         <section className="auth-form-side" aria-labelledby={refineLogin ? "login-heading" : undefined}>
           <div className="auth-form-card">
             {refineLogin ? <h1 id="login-heading">{title}</h1> : <h2>{title}</h2>}
-            {!(recovery && recoverySent) && <p className="auth-form-card__intro">{request ? "Fill in your details to get started." : firstLogin ? "Replace your temporary password to continue." : recovery ? "Enter your account email to request a password reset link." : reset ? "Choose a new password for your account." : "Enter your email and password to access MapSilip."}</p>}
+            {!request && !(recovery && recoverySent) && <p className="auth-form-card__intro">{request ? "Fill in your details to get started." : firstLogin ? "Replace your temporary password to continue." : recovery ? "Enter your account email to request a password reset link." : reset ? "Choose a new password for your account." : "Enter your email and password to access MapSilip."}</p>}
             {request ? (
               <>
-                <AccountRequestForm />
+                <AccountRequestForm onStageChange={setRequestStage} />
                 <p className="auth-switch">Already have an account? <Link href="/login">Log In</Link></p>
               </>
             ) : firstLogin ? (

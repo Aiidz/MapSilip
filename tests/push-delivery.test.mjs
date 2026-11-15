@@ -20,9 +20,9 @@ test('delivery respects existing staff and tenant auth activation gates',()=>{
 test('real dispatcher caps batch/concurrency and stops launching work after its deadline',async()=>{
  const {EventEmitter}=await import('node:events');
  for(const simulatedDelay of [0,3000]){
-  let active=0,maximum=0,clock=0;const finish=[];const exports={};const policy=load();
+  let active=0,maximum=0,clock=0,claimed=false;const finish=[];const exports={};const policy=load();
   const client={rpc:(name,args)=>{const pending=(async()=>{
-   if(name==='mapsilip_push_claim'){assert.equal(args.p_limit,20);return {data:Array.from({length:20},(_,i)=>({id:String(i),token:'claim'}))}}
+   if(name==='mapsilip_push_claim'){assert.equal(args.p_limit,20);if(claimed)return {data:[]};claimed=true;return {data:Array.from({length:20},(_,i)=>({id:String(i),token:'claim'}))}}
    if(name==='mapsilip_push_delivery_check')return {data:{...args,id:args.p_id,token:args.p_token,attempt:1,notificationId:'notice',category:'payments',role:'tenant',ttl:100,subscription:{endpoint:'https://fcm.googleapis.com/test',keys:{}}}};
    finish.push(args);return {data:null};
   })();return {abortSignal:()=>pending}}};

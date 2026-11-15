@@ -1,11 +1,14 @@
 'use client';
 
+import { CloseIcon } from "./CloseIcon";
+
 import {
   useCallback,
   useEffect,
   useId,
   useRef,
   type MouseEvent,
+  type PointerEvent,
   type ReactNode,
 } from 'react';
 
@@ -48,6 +51,38 @@ export function ResponsiveOverlay({
   const onCloseRef = useRef(onClose);
   const titleId = useId();
   const descriptionId = useId();
+  const drag = useRef<{ id: number; startY: number; startedAt: number; distance: number } | null>(null);
+
+  function startDrag(event: PointerEvent<HTMLElement>) {
+    if (!dismissible || !open || event.button !== 0 || !event.isPrimary || !window.matchMedia('(max-width: 767px)').matches ||
+      (event.target as Element).closest('button,a,input,textarea,select')) return;
+    drag.current = { id: event.pointerId, startY: event.clientY, startedAt: event.timeStamp, distance: 0 };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dialogRef.current?.classList.remove('ps-overlay--drag-return');
+    dialogRef.current?.classList.add('ps-overlay--dragging');
+  }
+
+  function moveDrag(event: PointerEvent<HTMLElement>) {
+    const gesture = drag.current;
+    if (!gesture || gesture.id !== event.pointerId) return;
+    gesture.distance = Math.max(0, event.clientY - gesture.startY);
+    dialogRef.current?.style.setProperty('--sheet-drag-y', `${gesture.distance}px`);
+  }
+
+  function finishDrag(event: PointerEvent<HTMLElement>) {
+    const gesture = drag.current;
+    if (!gesture || gesture.id !== event.pointerId) return;
+    drag.current = null;
+    const dialog = dialogRef.current;
+    const speed = gesture.distance / Math.max(1, event.timeStamp - gesture.startedAt);
+    const threshold = Math.min(140, Math.max(80, (dialog?.offsetHeight ?? 400) * .22));
+    const dismiss = event.type !== 'pointercancel' && (gesture.distance > threshold || (gesture.distance > 30 && speed > .6));
+    dialog?.classList.remove('ps-overlay--dragging');
+    dialog?.classList.add('ps-overlay--drag-return');
+    dialog?.style.setProperty('--sheet-drag-y', '0px');
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (dismiss) requestClose();
+  }
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -65,6 +100,9 @@ export function ResponsiveOverlay({
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
+    drag.current = null;
+    dialog.classList?.remove('ps-overlay--dragging', 'ps-overlay--drag-return');
+    dialog.style?.removeProperty('--sheet-drag-y');
 
     if (open && !dialog.open) {
       dialog.showModal();
@@ -120,8 +158,8 @@ export function ResponsiveOverlay({
       }}
       onClick={handleBackdrop}
     >
-      <span className="ps-overlay__grab" aria-hidden="true" />
-      <header className="ps-overlay__header">
+      <span className="ps-overlay__grab" aria-hidden="true" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={finishDrag} onPointerCancel={finishDrag} />
+      <header className="ps-overlay__header" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={finishDrag} onPointerCancel={finishDrag}>
         <div>
           <h2 id={titleId}>{title}</h2>
           {description ? <p id={descriptionId}>{description}</p> : null}
@@ -133,7 +171,7 @@ export function ResponsiveOverlay({
           onClick={requestClose}
           aria-label="Close"
         >
-          <span aria-hidden="true">×</span>
+          <CloseIcon />
         </button>
       </header>
       <div className="ps-overlay__body">{children}</div>

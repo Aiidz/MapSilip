@@ -1,91 +1,162 @@
 'use client';
 
-import { DataSkeleton } from './DataSkeleton';
-
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { ResponsiveOverlay } from './ResponsiveOverlay';
+import { DataSkeleton } from './DataSkeleton';
+import { Icon } from './Icon';
+import { manilaToday } from '../lib/room-context.mjs';
+import { reviewRoomOptions, type ReviewRoom } from '../lib/access-review.mjs';
+import { prepareUpload, uploadPreparedAttachment } from '../lib/uploads/client';
 
-type Request = { id: string; display_name: string; email: string; phone: string | null; status: string; created_at: string };
-type Room = { id: string; room_number: string; floor_label: string; availability: string };
-
+type AccessRequest = { id: string; display_name: string; email: string; phone: string | null; gender?: string; preferred_room_id?: string | null; created_at: string };
+type Assignment = { room_id: string; ended_on: string | null };
+const php = (amount: number | null) => amount == null ? 'Rent not set' : new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(amount);
 async function getAll(resource: string, status = '') {
   const rows: Record<string, unknown>[] = [];
   for (let page = 1; page <= 100; page++) {
     const query = new URLSearchParams({ resource, page: String(page), pageSize: '100' });
     if (status) query.set('status', status);
-    const response = await fetch(`/api/operations?${query}`);
+    const response = await fetch(`/api/operations?${query}`, { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Records could not be loaded.');
     rows.push(...result.rows);
-    if (rows.length >= result.count || !result.rows.length) break;
+    if (rows.length >= result.count || !result.rows.length) return rows;
   }
-  return rows;
+  throw new Error('The complete records could not be loaded. Refine this workspace before reviewing requests.');
 }
 
 export function AccountRequestsDialog({ open }: { open: boolean }) {
   const router = useRouter();
-  const dialog = useRef<HTMLDialogElement>(null);
-  const [requests, setRequests] = useState<Request[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [selected, setSelected] = useState<Request | null>(null);
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [rooms, setRooms] = useState<ReviewRoom[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [selected, setSelected] = useState<AccessRequest | null>(null);
   const [decision, setDecision] = useState<'approved' | 'rejected'>('approved');
+  const [roomId, setRoomId] = useState('');
+  const [search, setSearch] = useState('');
+  const [roomSearch, setRoomSearch] = useState('');
+  const [floor, setFloor] = useState('all');
+  const [startedOn, setStartedOn] = useState(manilaToday);
+  const [endOn, setEndOn] = useState('');
+  const [note, setNote] = useState('');
+  const [contract, setContract] = useState<File | null>(null);
+  const [preview, setPreview] = useState('');
+  const uploadedContract = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const locked = busy || preparing;
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  const queueHeading = useRef<HTMLHeadingElement>(null);
+
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setLoadError('');
     try {
-      const [requestRows, roomRows] = await Promise.all([getAll('accountRequests', 'pending'), getAll('rooms')]);
-      setRequests(requestRows as Request[]);
-      setRooms(roomRows as Room[]);
-      setSelected(current => requestRows.find(row => row.id === current?.id) as Request || null);
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Requests could not be loaded.'); }
+      const [requestRows, roomRows, assignmentRows] = await Promise.all([getAll('accountRequests', 'pending'), getAll('rooms'), getAll('assignments')]);
+      setRequests(requestRows as AccessRequest[]); setRooms(roomRows as ReviewRoom[]); setAssignments(assignmentRows as Assignment[]);
+    } catch (caught) { setLoadError(caught instanceof Error ? caught.message : 'Requests could not be loaded.'); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => {
-    if (!open) return;
-    const node = dialog.current;
-    node?.showModal();
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => { window.clearTimeout(timer); node?.close(); };
-  }, [open, load]);
-  function close() { dialog.current?.close(); router.replace('/management'); }
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selected || busy) return;
-    const fields = new FormData(event.currentTarget);
-    const note = String(fields.get('note') || '').trim();
-    if (decision === 'rejected' && !note) { setMessage('Add a reason before rejecting this request.'); return; }
-    setBusy(true); setMessage('');
-    try {
-      const response = await fetch('/api/account-requests/review', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selected.id, decision,
-          room_id: decision === 'approved' ? fields.get('room_id') : null,
-          started_on: decision === 'approved' ? fields.get('started_on') || null : null,
-          note: note || null }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Review could not be saved.');
-      setMessage(result.message || 'Review saved.');
-      setSelected(null);
-      await load();
-      router.refresh();
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Review could not be saved.'); }
+  useEffect(() => { if (!open) return; const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [open, load]);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  // Unlinked uploads remain visible for owner review; leaving a dialog never deletes evidence.
+  async function discardUpload() { uploadedContract.current = null; }
+  async function close() {
+    if (locked) return;
+    setBusy(true);
+    try { await discardUpload(); router.replace('/management'); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not close this review.'); }
     finally { setBusy(false); }
   }
-  return <dialog ref={dialog} className="account-review-dialog" aria-labelledby="account-review-title" onClose={() => router.replace('/management')}>
-    <div className="account-review-dialog__header"><div><small>APPLICATIONS</small><h2 id="account-review-title">Access requests</h2></div><button type="button" className="account-review-dialog__close" onClick={close} aria-label="Close access requests">×</button></div>
-    <div className="account-review-dialog__body">
-      <aside className="account-review-dialog__list" aria-label="Pending requests"><h3>Awaiting review <span>{requests.length}</span></h3>
-        {loading && !requests.length ? <DataSkeleton label="Loading account requests" /> : requests.length ? requests.map(request => <button type="button" key={request.id} className={selected?.id === request.id ? 'is-selected' : ''} onClick={() => { setSelected(request); setMessage(''); setDecision('approved'); }}><span className="account-review-dialog__avatar">{request.display_name?.slice(0,1).toUpperCase() || '?'}</span><span><strong>{request.display_name}</strong><small>{request.email}</small></span></button>) : <p>No access requests are waiting for review.</p>}
+  async function selectRequest(request: AccessRequest | null) {
+    if (locked) return;
+    setBusy(true);
+    try {
+      await discardUpload(); setSelected(request); setRoomId(''); setRoomSearch(''); setFloor('all'); setDecision('approved'); setStartedOn(manilaToday()); setEndOn(''); setNote(''); setContract(null); setPreview(''); setError('');
+      window.requestAnimationFrame(() => (request ? detailHeading : queueHeading).current?.focus());
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not switch requests.'); }
+    finally { setBusy(false); }
+  }
+  async function chooseContract(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]; event.target.value = '';
+    if (!file || locked) return;
+    setPreparing(true); setError('');
+    try { const prepared = await prepareUpload(file, 'contract'); await discardUpload(); setContract(prepared); setPreview(URL.createObjectURL(prepared)); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'The contract image could not be prepared.'); }
+    finally { setPreparing(false); }
+  }
+  const options = reviewRoomOptions(rooms, assignments, selected?.gender);
+  const chosen = options.find(room => room.id === roomId && room.eligible);
+  const visibleRooms = options.filter(room => (floor === 'all' || floor === room.floor_label) && `${room.room_number} ${room.floor_label}`.toLowerCase().includes(roomSearch.trim().toLowerCase()));
+  const filteredRequests = requests.filter(request => `${request.display_name} ${request.email}`.toLowerCase().includes(search.trim().toLowerCase()));
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!selected || locked || loadError) return;
+    if (decision === 'approved' && !chosen) { setError('Select an eligible room before approving.'); return; }
+    if (decision === 'rejected' && !note.trim()) { setError('Add a reason for the applicant.'); return; }
+    setBusy(true); setError(''); setMessage('');
+    try {
+      if (decision === 'approved' && contract && !uploadedContract.current) uploadedContract.current = await uploadPreparedAttachment(contract, 'contract');
+      if (decision === 'rejected') await discardUpload();
+      const response = await fetch('/api/account-requests/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        id: selected.id, decision, room_id: decision === 'approved' ? roomId : null,
+        started_on: decision === 'approved' ? startedOn : null, note: note.trim() || null,
+        contract_attachment_id: decision === 'approved' ? uploadedContract.current : null,
+        contract_end_on: decision === 'approved' ? endOn || null : null,
+      }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Review could not be saved. The room may have changed; refresh the room list and try again.');
+      uploadedContract.current = null; setContract(null); setPreview(''); setSelected(null); setRoomId('');
+      setMessage(result.message || 'Review saved.'); await load(); router.refresh();
+      window.requestAnimationFrame(() => queueHeading.current?.focus());
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Review could not be saved.'); }
+    finally { setBusy(false); }
+  }
+
+  return <ResponsiveOverlay open={open} onClose={() => void close()} dismissible={!locked} title="Access requests" description="Review an applicant, choose their room, and link their rental contract." className="access-review">
+    {message && <p className="access-review__notice" role="status">{message}</p>}
+    {loadError && <p className="access-review__error" role="alert">{loadError} <button type="button" disabled={locked} onClick={() => void load()}>Retry loading</button></p>}
+    {error && <p className="access-review__error" role="alert">{error}</p>}
+    <div className={`access-review__layout${selected ? ' has-selection' : ''}`} aria-busy={loading || locked}>
+      <aside className="access-review__queue" aria-label="Pending applications">
+        <div className="access-review__section-heading"><h3 ref={queueHeading} tabIndex={-1}>Awaiting review</h3><span>{loading ? '…' : requests.length}</span></div>
+        <label className="access-review__search"><Icon name="search" /><span className="sr-only">Search applicants</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find an applicant" disabled={locked} /></label>
+        {loading && !requests.length ? <DataSkeleton label="Loading access requests" /> : <div className="access-review__applicants">{filteredRequests.map(request => <button key={request.id} type="button" disabled={locked} aria-pressed={selected?.id === request.id} onClick={() => void selectRequest(request)}><span className="access-review__avatar" aria-hidden="true">{request.display_name.slice(0, 1).toUpperCase()}</span><span><strong>{request.display_name}</strong><small>{request.email}</small></span><Icon name="chevron" /></button>)}{!filteredRequests.length && !loadError && <p className="access-review__empty">{search ? 'No applicants match your search.' : 'All caught up. New access requests will appear here.'}</p>}</div>}
       </aside>
-      <section className="account-review-dialog__details" aria-label="Request details">{selected ? <><div className="account-review-dialog__person"><span className="account-review-dialog__avatar">{selected.display_name?.slice(0,1).toUpperCase() || '?'}</span><div><strong>{selected.display_name}</strong><small>Submitted {new Date(selected.created_at).toLocaleDateString()}</small></div></div>
-        <dl><div><dt>Email</dt><dd>{selected.email}</dd></div><div><dt>Phone</dt><dd>{selected.phone || 'Not provided'}</dd></div><div><dt>Status</dt><dd>Pending review</dd></div></dl>
-        <form onSubmit={submit}><h3>Review application</h3><div className="account-review-dialog__decisions"><button type="button" className={decision === 'approved' ? 'is-selected' : ''} onClick={() => setDecision('approved')}>Approve &amp; assign room</button><button type="button" className={decision === 'rejected' ? 'is-selected' : ''} onClick={() => setDecision('rejected')}>Reject</button></div>
-          {decision === 'approved' ? <div className="account-review-dialog__fields"><label>Available room<select name="room_id" required defaultValue=""><option value="" disabled>Choose a room</option>{rooms.filter(room => room.availability === 'available').map(room => <option key={room.id} value={room.id}>Room {room.room_number} · {room.floor_label}</option>)}</select></label><label>Start date (optional)<input name="started_on" type="date" /></label></div> : <label>Reason for rejection<textarea name="note" required maxLength={500} rows={3} placeholder="Explain the decision to the applicant" /></label>}
-          <div className="account-review-dialog__actions"><button type="submit" className="button button--primary" disabled={busy || (decision === 'approved' && !rooms.some(room => room.availability === 'available'))}>{busy ? 'Saving…' : decision === 'approved' ? 'Approve request' : 'Reject request'}</button></div>
-        </form></> : <div className="account-review-dialog__empty">Select an applicant to review their request.</div>}</section>
-    </div>{message && <p className="account-review-dialog__message" role="status">{message}</p>}
-  </dialog>;
+      <section className="access-review__detail" aria-label="Application review">
+        {selected ? <>
+          <button type="button" className="access-review__back" onClick={() => void selectRequest(null)} disabled={locked}>← All requests</button>
+          <div className="access-review__identity"><span className="access-review__avatar" aria-hidden="true">{selected.display_name.slice(0, 1).toUpperCase()}</span><div><small>APPLICANT</small><h3 ref={detailHeading} tabIndex={-1}>{selected.display_name}</h3><p>Requested {new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(selected.created_at))}</p></div></div>
+          {selected.preferred_room_id && <div className="access-review__preference"><strong>Preferred room: {rooms.find(room => room.id === selected.preferred_room_id)?.room_number ? `Room ${rooms.find(room => room.id === selected.preferred_room_id)?.room_number}` : 'Unavailable'}</strong><span>Final assignment is up to you.</span></div>}
+          <dl className="access-review__facts"><div><dt>Email</dt><dd>{selected.email}</dd></div><div><dt>Phone</dt><dd>{selected.phone || 'Not provided'}</dd></div><div><dt>Gender</dt><dd>{selected.gender === 'male' ? 'Male' : selected.gender === 'female' ? 'Female' : 'Not provided'}</dd></div></dl>
+          <form onSubmit={submit}>
+            <fieldset disabled={locked || loading || Boolean(loadError)} className="access-review__form-fields">
+              <legend className="sr-only">Review application</legend>
+              <div className="access-review__decision" role="group" aria-label="Review decision">{(['approved', 'rejected'] as const).map(value => <button key={value} type="button" aria-pressed={decision === value} onClick={() => { setDecision(value); setError(''); }}>{value === 'approved' ? 'Approve & assign' : 'Reject request'}</button>)}</div>
+              {decision === 'approved' ? <>
+                <section className="access-review__room-section"><div className="access-review__section-heading"><h4>Choose a room</h4><button type="button" className="access-review__refresh" onClick={() => void load()}>Refresh availability</button></div><p>Only rooms with space and a matching gender policy can be selected.</p>
+                  <label className="access-review__search"><Icon name="search" /><span className="sr-only">Search rooms</span><input type="search" value={roomSearch} onChange={event => setRoomSearch(event.target.value)} placeholder="Search room or floor" /></label>
+                  <div className="access-review__floors" role="group" aria-label="Filter rooms by floor">{['all', ...new Set(rooms.map(room => room.floor_label))].map(value => <button key={value} type="button" aria-pressed={floor === value} onClick={() => setFloor(value)}>{value === 'all' ? 'All floors' : value}</button>)}</div>
+                  <fieldset className="access-review__rooms"><legend className="sr-only">Available room selection</legend>{visibleRooms.map(room => <label key={room.id} className={`access-review__room${!room.eligible ? ' is-unavailable' : ''}`}><input type="radio" name="room_id" value={room.id} checked={roomId === room.id} disabled={!room.eligible} onChange={() => setRoomId(room.id)} /><span><strong>Room {room.room_number}{selected.preferred_room_id === room.id ? ' · Preferred' : ''}</strong><small>{room.floor_label} · {room.gender_policy === 'male' ? 'Boys only' : room.gender_policy === 'female' ? 'Girls only' : 'Unrestricted'}</small><span>{room.reason || `${room.vacancies} of ${room.capacity} slots available`}</span></span><span className="access-review__rent"><strong>{php(room.monthly_rent)}</strong><small>per tenant / month</small></span></label>)}{!visibleRooms.length && <p className="access-review__empty">No rooms match these filters.</p>}</fieldset>
+                </section>
+                <section className="access-review__contract"><h4>Rental contract</h4><p>Attach an original PDF or readable image for the tenant. Uploading a contract is optional.</p><div className="access-review__dates"><label>Start date<input type="date" value={startedOn} onChange={event => setStartedOn(event.target.value)} required /></label><label>End date <small>optional</small><input type="date" value={endOn} min={startedOn} onChange={event => setEndOn(event.target.value)} /></label></div>
+                  <label className="access-review__upload"><Icon name="fileSearch" /><span><strong>{preparing ? 'Preparing image…' : contract ? 'Replace contract file' : 'Choose contract file'}</strong><small>PDF, JPEG or PNG · originals preserved · up to 2 MB</small></span><input type="file" accept="application/pdf,image/jpeg,image/png" onChange={event => void chooseContract(event)} disabled={locked} /></label>
+                  {contract && <div className="access-review__preview">{/* Local object URL only; no private document leaves the browser before submission. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {contract.type === 'application/pdf' ? <p>Original PDF selected. Open it on your device to check legibility before approval.</p> : <img src={preview || undefined} alt="Rental contract preview. Check that the text is readable before approval." />}
+                    <div><span>{contract.name} · {Math.ceil(contract.size / 1024)} KB</span><button type="button" onClick={() => { setBusy(true); void discardUpload().then(() => { setContract(null); setPreview(''); }).catch(caught => setError(caught instanceof Error ? caught.message : 'Could not remove upload.')).finally(() => setBusy(false)); }}>Remove image</button></div><p>Check names, dates, and signatures in the preview before approving.</p>
+                  </div>}
+                </section>
+              </> : <label className="access-review__reason">Reason for rejection<textarea required minLength={1} maxLength={500} rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="Explain the decision to the applicant" /></label>}
+              <div className="access-review__confirmation">{decision === 'approved' ? chosen ? <p><strong>{selected.display_name}</strong> → Room {chosen.room_number}<br /><span>{php(chosen.monthly_rent)} per tenant / month{contract ? ' · Contract image attached' : ' · No contract image'}</span></p> : <p>Select a room to complete this approval.</p> : <p>The applicant will receive your reason. No room will be assigned.</p>}<button type="submit" className="button button--primary" disabled={locked || loading || Boolean(loadError) || (decision === 'approved' && !chosen)}>{busy ? 'Saving review…' : preparing ? 'Preparing image…' : decision === 'approved' ? 'Confirm approval' : 'Confirm rejection'}</button></div>
+            </fieldset>
+          </form>
+        </> : <div className="access-review__welcome"><Icon name="users" width={36} height={36} /><h3>Give every arrival a clear start</h3><p>Select an applicant to review their details, assign an eligible room, and attach their rental contract.</p></div>}
+      </section>
+    </div>
+  </ResponsiveOverlay>;
 }

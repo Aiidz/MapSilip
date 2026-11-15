@@ -20,8 +20,8 @@ export default async function TenantDetailsPage() {
         <aside className="tenant-details-update"><Icon name="info" /><div><strong>Need to update your information?</strong><p>Please contact the dormitory admin for changes to your personal details.</p><Link href="/tenant/profile" className="button button--secondary">Request an Update</Link></div></aside>
       </section>
       <section className="tenant-my-details-card tenant-contract-card"><h2>Contract Details</h2><dl>
-        <Field label="Room Assignment" value={profile.roomNumber ? `Room ${profile.roomNumber}` : null} /><Field label="Contract Start Date" value={profile.startedOn} /><Field label="Contract End Date" /><Field label="Monthly Rent" value={profile.invoice ? `${profile.invoice.currency} ${profile.invoice.amount}` : null} /><Field label="Contract Status" />
-      </dl><div className="tenant-contract-document"><Icon name="fileSearch" /><span>Rental contract not linked</span></div></section>
+        <Field label="Room Assignment" value={profile.roomNumber ? `Room ${profile.roomNumber}` : null} /><Field label="Contract Start Date" value={profile.startedOn} /><Field label="Contract End Date" value={profile.contractEndOn} /><Field label="Monthly Rent" value={profile.monthlyRent == null ? null : new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(profile.monthlyRent)} /><Field label="Contract Document" value={profile.contractAttachmentId ? 'Linked' : 'Not linked'} />
+      </dl><div className="tenant-contract-document"><Icon name="fileSearch" />{profile.contractAttachmentId ? <a href={`/api/attachments?id=${encodeURIComponent(profile.contractAttachmentId)}`}>View rental contract</a> : <span>Rental contract not linked</span>}</div></section>
     </div>
   </div>;
 }

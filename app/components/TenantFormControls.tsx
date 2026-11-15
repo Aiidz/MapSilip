@@ -56,13 +56,15 @@ export function TenantDropdown({
         className="tenant-dropdown__summary"
         aria-haspopup="listbox"
         tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
+        onClick={event => { if (disabled) event.preventDefault(); }}
       >
         <span className={selected ? 'tenant-dropdown__label' : 'tenant-dropdown__placeholder'}>
           {selected ? selected.label : placeholder}
         </span>
         <Icon name="chevron" className="tenant-dropdown__chevron" />
       </summary>
-      <input type="hidden" name={name} value={value} required={required} />
+      <select className="sr-only" name={name} value={value} required={required} disabled={disabled} aria-label={placeholder} onChange={event => onChange(event.target.value)}><option value="">{placeholder}</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
       <div className="tenant-dropdown__menu" role="listbox">
         {options.map((option) => {
           const isSelected = option.value === value;
@@ -71,6 +73,7 @@ export function TenantDropdown({
               type="button"
               key={option.value}
               role="option"
+              disabled={disabled}
               aria-selected={isSelected}
               className={`tenant-dropdown__item${isSelected ? ' is-selected' : ''}`}
               onClick={(e) => {
@@ -104,7 +107,7 @@ export function TenantFileDropzone({
   accept,
   required = false,
   title = 'Choose file',
-  subtitle = 'JPG, PNG or PDF up to 2MB',
+  subtitle = 'Images optimized automatically · PDF up to 2 MB',
   onChange,
 }: {
   name: string;

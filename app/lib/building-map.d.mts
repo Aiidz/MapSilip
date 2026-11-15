@@ -26,3 +26,12 @@ export function groupRoomsByFloor(rooms: BuildingRoom[]): { label: string; rooms
 export function modelFloors(floors: { label: string; rooms: BuildingRoom[] }[]): { label: string; rooms: BuildingRoom[] }[];
 export function pageRooms<T>(rooms: T[], page: number, size?: number): T[];
 export function summarizeRoomIssues(rooms: BuildingRoom[], issues: BuildingIssue[]): Map<string, RoomIssueSummary>;
+
+export type RoomPosition = { number: number; x: number; y: number; door: 'front' | 'left' | 'right'; beds: boolean; width?: number };
+export const ROOM_LAYOUT: RoomPosition[];
+export const THIRD_ROOM_LAYOUT: RoomPosition[];
+export function roomLayoutForFloor(floorLabel: string): RoomPosition[];
+export function roomSlotIndex(room: BuildingRoom): number;
+export function roomDisplayNumber(floorLabel: string, index: number): number;
+export function mapRoomSlots(rooms: BuildingRoom[], floorLabel?: string): (BuildingRoom | undefined)[];
+export function dollhouseLevelOffsets(selectedFloor: string | null): number[];

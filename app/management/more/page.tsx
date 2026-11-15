@@ -30,10 +30,7 @@ const links = [
 export default function ManagementMorePage() {
   return (
     <>
-      <PageHeader
-        title="More workspace views"
-        description="The everyday tools, kept easy to find."
-      />
+      <PageHeader title="More workspace views" description="The everyday tools, kept easy to find." />
       <Panel
         title="Other sections"
         description="More tools for everyday operations."

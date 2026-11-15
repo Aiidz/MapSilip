@@ -46,7 +46,7 @@ test('account request UI matches reference design with password retention and vi
   assert.match(form, /placeholder="First name"/);
   assert.match(form, /placeholder="Last name"/);
   assert.match(form, /placeholder="09XX XXX XXXX"/);
-  assert.match(form, /placeholder="admin@gmail.com"/);
+  assert.match(form, /placeholder="you@example.com"/);
   assert.match(form, /placeholder="Enter password"/);
   assert.match(form, /placeholder="Confirm password"/);
 
@@ -55,10 +55,10 @@ test('account request UI matches reference design with password retention and vi
   assert.match(form, /showPassword/);
   assert.match(form, /showConfirm/);
   assert.match(form, /auth-password-toggle/);
-  assert.match(form, /Request Account/);
+  assert.match(form, /Send request/);
 
   // AuthPreview title and subtitle
-  assert.match(preview, /title\s*=\s*request\s*\?\s*"Create Account"/);
+  assert.match(preview, /"Create Account"/);
   assert.match(preview, /Fill in your details to get started\./);
 });
 
@@ -73,7 +73,7 @@ test('tenant account request route accepts original password and registers reque
   assert.doesNotMatch(route, /auth\.signUp/);
   assert.match(route, /!password/);
   assert.match(route, /password !== confirmPassword/);
-  assert.match(route, /executor\.submitAccountRequest\(email,\s*name,\s*phone\s*\|\|\s*null,\s*userId\)/);
+  assert.match(route, /executor\.submitAccountRequest\(email,\s*name,\s*phone\s*\|\|\s*null,\s*userId,\s*gender,\s*preferredRoomId\)/);
   assert.match(route, /accountRequestProvisioningReady\(\)/);
   assert.ok(route.indexOf('accountRequestProvisioningReady()') < route.indexOf('auth.admin.createUser'),
     'migration availability must be checked before creating an Auth identity');
@@ -87,7 +87,7 @@ test('admin review enforces room assignment on approval and provides rejection h
   assert.match(route, /requireStaffAccess\('tenant\.application\.approve'\)/);
   assert.match(route, /decision\s*===\s*'approved'/);
   assert.match(route, /room_id/);
-  assert.match(route, /mapsilip_review_account_request/);
+  assert.match(route, /mapsilip_review_account_contract/);
 
   // Operational workspace provides room selection on review
   assert.match(workspace, /action\s*===\s*'account\.review'/);
@@ -323,7 +323,7 @@ test('status endpoint provides limited applicant decision view without session c
   assert.match(statusRoute, /noStoreHeaders/);
 
   // Account creation exposes only the request form.
-  assert.match(form, /Request Account/);
+  assert.match(form, /Send request/);
   assert.doesNotMatch(form, /Check Status|statusResult|\/api\/account-requests\/status/);
 });
 

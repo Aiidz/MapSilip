@@ -53,7 +53,9 @@ function workspace(file, component, props, fetch) {
   vm.runInNewContext(source, {exports, URLSearchParams, AbortController, fetch, window:{setTimeout,clearTimeout}, require(name) {
     if(name==='react') return react;
     if(name==='react/jsx-runtime') return {jsx,jsxs:jsx};
+    if(name==='./DataSkeleton') return {DataSkeleton:'DataSkeleton'};
     if(name.includes('workspace-loading')) return helper;
+    if(name==='next/dynamic') return {default:() => () => null};
     if(name==='next/navigation') return {useRouter:()=>({})};
     return {};
   }});
@@ -95,4 +97,69 @@ test('concerns pagination can request records after the hundredth concern', asyn
   }
   for(let i=0;i<4;i++) {const next=findNext(h.render());assert.ok(next);assert.equal(next.props.disabled,false);next.props.onClick();h.render();await h.callbacks[0]();}
   assert.equal(pages.at(-1),'5');
+});
+
+test('payment search loads records without requesting or waiting for dashboard metrics',async()=>{
+ const urls=[];
+ const h=workspace('ManagementPaymentsWorkspace','ManagementPaymentsWorkspace',{},async url=>{
+  urls.push(url);return {ok:true,json:async()=>({rows:[{id:'payment'}],count:1})};
+ });
+ h.render();await h.callbacks[0]();await h.callbacks[0]();
+ assert.equal(urls.filter(url=>url==='/api/dashboard').length,0);
+ assert.equal(h.state[0][0].id,'payment');
+});
+
+test('owner dashboard displays available summary before slow recent records',async()=>{
+ let finishRecent;
+ const h=workspace('DashboardOverview','DashboardOverview',{role:'owner'},url=>{
+  if(url==='/api/dashboard')return Promise.resolve({ok:true,json:async()=>({pending_payments:7,income_by_currency:[]})});
+  if(url.includes('resource=rooms'))return Promise.resolve({ok:true,json:async()=>({rows:[],count:24})});
+  return new Promise(resolve=>{finishRecent=resolve});
+ });
+ h.render();const loading=h.callbacks[0]();
+ await new Promise(resolve=>setImmediate(resolve));
+ try {assert.equal(h.state[0]?.pending_payments,7);}finally{finishRecent({ok:true,json:async()=>({rows:[],count:0})});await loading;}
+});
+
+test('payment summary refresh ignores older responses and unmounted requests',async()=>{
+ const pending=[];
+ const h=workspace('ManagementPaymentsWorkspace','ManagementPaymentsWorkspace',{},()=>new Promise(resolve=>pending.push(resolve)));
+ h.render();const old=h.callbacks[1]();const latest=h.callbacks[1]();
+ pending[1]({ok:true,json:async()=>({pending_payments:2})});await latest;
+ pending[0]({ok:true,json:async()=>({pending_payments:9})});await old;
+ assert.equal(h.state[6].pending_payments,2);
+ const cleanup=h.effects[1]();
+ cleanup();pending[2]({ok:true,json:async()=>({pending_payments:99})});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.state[6].pending_payments,2);
+});
+
+test('notification first load shows card skeletons, not an empty-state flash',()=>{
+ const h=workspace('NotificationWorkspace','NotificationWorkspace',{area:'management'},()=>new Promise(()=>{}));
+ const tree=h.render();
+ assert.ok(JSON.stringify(tree).includes('\"type\":\"DataSkeleton\"'));
+ assert.ok(JSON.stringify(tree).includes('Loading notifications'));
+ assert.equal(JSON.stringify(tree).includes('No notifications to display'),false);
+});
+
+test('concerns first load reserves the list shape instead of showing no records',()=>{
+ const h=workspace('ManagementConcernsWorkspace','ManagementConcernsWorkspace',{},()=>new Promise(()=>{}));
+ const tree=h.render();
+ assert.ok(JSON.stringify(tree).includes('Loading concerns'));
+});
+
+test('notification refresh keeps its existing cards while the next request is pending',async()=>{
+ let finish;let calls=0;
+ const h=workspace('NotificationWorkspace','NotificationWorkspace',{area:'management'},()=>++calls===1
+  ? Promise.resolve({ok:true,json:async()=>({rows:[{id:'notice',title:'Existing notice',body:'Update',event_key:'maintenance:test',read_at:null,created_at:'2026-11-08T00:00:00Z',href:'/management'}],count:1})})
+  : new Promise(resolve=>{finish=resolve}));
+ h.render();await h.callbacks[0]();h.render();const refreshing=h.callbacks[0]();
+ const tree=JSON.stringify(h.render());assert.ok(tree.includes('Existing notice'));assert.equal(tree.includes('"type":"DataSkeleton"'),false);
+ finish({ok:true,json:async()=>({rows:[],count:0})});await refreshing;
+});
+
+test('failed initial notification request stops skeleton and offers retry',async()=>{
+ const h=workspace('NotificationWorkspace','NotificationWorkspace',{area:'management'},async()=>({ok:false}));
+ h.render();await h.callbacks[0]();const tree=JSON.stringify(h.render());
+ assert.equal(tree.includes('"type":"DataSkeleton"'),false);assert.ok(tree.includes('Notifications could not be loaded.'));assert.ok(tree.includes('Retry'));
 });

@@ -9,7 +9,7 @@ function load(file,modules={},globals={}){
  vm.runInNewContext(source,{...globals,exports,require:n=>n==='react/jsx-runtime'?{jsx,jsxs:jsx}:modules[n]??{}});return exports;
 }
 function onboarding(mode,mobile=true){
- const {PwaOnboarding}=load('app/components/PwaOnboarding.tsx',{'./ResponsiveOverlay':{ResponsiveOverlay:'Overlay'},'./PushPreferences':{PushPreferences:'PushPreferences'},'./Icon':{Icon:'Icon'},'./BrowserNotificationSettings':{BrowserNotificationSettings:'BrowserNotificationSettings'}});
+ const {PwaOnboarding}=load('app/components/PwaOnboarding.tsx',{'react':{useState:v=>[v,()=>{}],useRef:v=>({current:v}),useEffect:()=>{}},'./ResponsiveOverlay':{ResponsiveOverlay:'Overlay'},'./PushPreferences':{PushPreferences:'PushPreferences'},'./Icon':{Icon:'Icon'},'./BrowserNotificationSettings':{BrowserNotificationSettings:'BrowserNotificationSettings'}});
  return PwaOnboarding({open:true,onClose(){},onInstall(){},ios:false,nativeInstall:true,standalone:false,updateAvailable:false,onUpdate(){},pushEnabled:false,mode,mobile,userId:'synthetic-user'});
 }
 test('phone install invitation is separate from notification permission and enrollment',()=>{
@@ -27,7 +27,8 @@ test('pre-login install capability remains usable after login and is consumed on
  stop();target.dispatchEvent(event);assert.equal(capture.getInstallPrompt(),null);
 });
 
-function manager({phone=true,storage=new Map(),earlyPrompt=false,ios=false,standalone=false}={}){
+function manager({phone=true,storage=new Map(),earlyPrompt=false,ios=false,standalone=false,photoDecision=true,photoStatus=404}={}){
+ if(photoDecision) storage.set('mapsilip.onboarding.v1:profile:synthetic-user','done');
  const window=new EventTarget(),document=new EventTarget();document.visibilityState='visible';
  window.innerWidth=phone?390:1440;window.localStorage={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)};
  window.matchMedia=query=>Object.assign(new EventTarget(),{matches:query.includes('standalone')?standalone:query.includes('coarse')?phone:phone});
@@ -37,7 +38,7 @@ function manager({phone=true,storage=new Map(),earlyPrompt=false,ios=false,stand
  let cursor=0;const values=[],effects=[];const jsx=(type,props)=>({type,props});
  const react={useSyncExternalStore:(_subscribe,snapshot)=>snapshot(),useState(value){const i=cursor++;if(!(i in values))values[i]=value;return [values[i],v=>{values[i]=typeof v==='function'?v(values[i]):v}]},useRef(value){const i=cursor++;return values[i]??={current:value}},useCallback:f=>f,useEffect:f=>effects.push(f)};
  const exports={};const source=ts.transpileModule(readFileSync('app/components/PwaManager.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
- vm.runInNewContext(source,{exports,window,document,navigator:{userAgent:ios?'iPhone':phone?'Android Mobile':'Desktop Chrome',maxTouchPoints:phone?1:0},Date,Boolean,require:n=>{
+ vm.runInNewContext(source,{exports,window,document,AbortController,fetch:async()=>new Response(null,{status:photoStatus,headers:photoStatus===200?{'content-type':'image/png'}:{}}),navigator:{userAgent:ios?'iPhone':phone?'Android Mobile':'Desktop Chrome',maxTouchPoints:phone?1:0},Date,Boolean,require:n=>{
   if(n==='react')return react;if(n==='react/jsx-runtime')return {jsx,jsxs:jsx};if(n==='next/dynamic')return {default:factory=>String(factory).includes('ForegroundNotifications')?'ForegroundFeed':'Onboarding'};
   if(n.endsWith('/onboarding'))return decisions;
   if(n.endsWith('/foreground'))return load('app/lib/pwa/foreground.ts');
@@ -47,8 +48,8 @@ function manager({phone=true,storage=new Map(),earlyPrompt=false,ios=false,stand
  render();const cleanup=effects[0]();
  return {render,window,document,storage,cleanup(){cleanup();stopCapture()}};
 }
-test('phone setup offers notifications before captured installation even with push off',()=>{
- const h=manager({earlyPrompt:true});try{const props=h.render();assert.equal(props.open,true);assert.equal(props.mode,'notifications');h.render().onContinue('later');assert.equal(h.render().mode,'invite');assert.equal(props.nativeInstall,true);assert.equal(props.pushEnabled,false)}finally{h.cleanup()}
+test('phone setup offers captured installation before notifications even with push off',()=>{
+ const h=manager({earlyPrompt:true});try{const props=h.render();assert.equal(props.open,true);assert.equal(props.mode,'invite');h.render().onContinue('later');assert.equal(h.render().mode,'notifications');assert.equal(props.nativeInstall,true);assert.equal(props.pushEnabled,false)}finally{h.cleanup()}
 });
 test('dismissed invitation can be reopened manually and desktop settings survive visibility changes',()=>{
  const phone=manager();try{phone.render().onClose();assert.equal(phone.render().open,false);phone.window.dispatchEvent(new Event('mapsilip-open-app-settings'));assert.equal(phone.render().mode,'settings');assert.equal(phone.render().open,true)}finally{phone.cleanup()}
@@ -81,7 +82,7 @@ test('desktop settings mount browser permission controls instead of mobile push 
 });
 test('mobile standard overlays keep default sheet positioning while onboarding stays full-screen',()=>{
  const css=readFileSync('app/globals.css','utf8');
- const mobileStart=css.lastIndexOf('@media (max-width: 767px)');
+ const mobileStart=css.lastIndexOf('@media (max-width: 767px)', css.indexOf('.ps-overlay,', css.indexOf('.ps-overlay__body')));
  const mobileEnd=css.indexOf('@media (max-width: 520px)',mobileStart);
  const mobile=css.slice(mobileStart,mobileEnd);
  assert.match(mobile, /\.ps-overlay,\s*\.ps-overlay--drawer\s*\{[\s\S]*?inset:\s*auto\s+0\s+0;/);
@@ -98,4 +99,28 @@ test('mobile toolbar popovers float upper-right instead of above bottom navigati
 });
 
  test('saved desktop decision prevents repeated onboarding after remount',()=>{const storage=new Map();let h=manager({phone:false,storage});h.render().onContinue('later');h.cleanup();h=manager({phone:false,storage});try{assert.equal(h.render(),undefined)}finally{h.cleanup()}});
- test('iPhone gets installation instructions after notifications, while standalone skips installation',()=>{let h=manager({ios:true});try{h.render().onContinue('later');assert.equal(h.render().mode,'invite');assert.equal(h.render().ios,true);assert.equal(h.render().nativeInstall,false)}finally{h.cleanup()}h=manager({ios:true,standalone:true});try{h.render().onContinue('later');assert.equal(h.render().open,false)}finally{h.cleanup()}});
+ test('iPhone gets installation instructions before notifications, while standalone skips installation',()=>{let h=manager({ios:true});try{assert.equal(h.render().mode,'invite');h.render().onContinue('later');assert.equal(h.render().mode,'notifications');assert.equal(h.render().ios,true);assert.equal(h.render().nativeInstall,false)}finally{h.cleanup()}h=manager({ios:true,standalone:true});try{h.render().onContinue('later');assert.equal(h.render().open,false)}finally{h.cleanup()}});
+
+const flush=()=>new Promise(resolve=>setImmediate(resolve));
+test('missing profile photo gets its own step and skip leaves installation and notifications available',async()=>{
+ const h=manager({earlyPrompt:true,photoDecision:false});try{
+  await flush();assert.equal(h.render().mode,'profile');
+  h.render().onContinue('later');assert.equal(h.render().mode,'invite');
+  h.render().onContinue('later');assert.equal(h.render().mode,'notifications');
+  h.render().onContinue('later');assert.equal(h.render().open,false);
+ }finally{h.cleanup()}
+});
+test('an existing profile photo skips upload, while photo service failure does not record completion',async()=>{
+ for(const photoStatus of [200,503]){
+  const h=manager({earlyPrompt:true,photoDecision:false,photoStatus});try{
+   await flush();assert.equal(h.render().mode,'invite');
+   assert.equal(h.storage.get('mapsilip.onboarding.v1:profile:synthetic-user'),photoStatus===200?'done':undefined);
+  }finally{h.cleanup()}
+ }
+});
+test('confirmed installation advances without closing the notification step',()=>{
+ const h=manager({earlyPrompt:true});try{
+  assert.equal(h.render().mode,'invite');h.window.dispatchEvent(new Event('appinstalled'));
+  assert.equal(h.render().standalone,true);assert.equal(h.render().mode,'notifications');assert.equal(h.render().open,true);
+ }finally{h.cleanup()}
+});

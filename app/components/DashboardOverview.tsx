@@ -7,7 +7,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLatestRequest } from '../lib/workspace-loading';
 import { Icon } from './Icon';
 import { EmptyState, PageHeader } from './ui';
+import { formatTenantMonthlyRent } from '../lib/tenant-dashboard.mjs';
 import dynamic from 'next/dynamic';
+const StorageManagementWorkspace = dynamic(() => import('./StorageManagementWorkspace').then(module => module.StorageManagementWorkspace), { loading: () => <p role="status">Opening export…</p> });
 const AccountRequestsDialog = dynamic(() => import('./AccountRequestsDialog').then(module => module.AccountRequestsDialog));
 
 type Row = Record<string, unknown>;
@@ -17,11 +19,13 @@ const number = (value: unknown) => Number(value || 0);
 const text = (value: unknown) => typeof value === 'string' ? value : '—';
 const statuses = (value: unknown) => value && typeof value === 'object' ? value as Record<string,number> : {};
 
-export function DashboardOverview({ role, showAccessRequests = false }: { role: Role; showAccessRequests?: boolean }) {
+export function DashboardOverview({ role, showAccessRequests = false, showExport = false }: { role: Role; showAccessRequests?: boolean; showExport?: boolean }) {
   const [data, setData] = useState<Summary | null>(null);
   const [recent, setRecent] = useState<Row[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const [exportOpen, setExportOpen] = useState(showExport);
+  const [exportMounted, setExportMounted] = useState(showExport);
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
@@ -90,9 +94,10 @@ export function DashboardOverview({ role, showAccessRequests = false }: { role: 
       { label:'Tenant access requests', count:number(data?.pending_accounts), href:'/management?accessRequests=1', note:'applications awaiting review', tone:'info' },
     ].filter(item => item.count > 0);
     return <div className="management-dashboard">
+      {exportMounted && <StorageManagementWorkspace open={exportOpen} onClose={() => setExportOpen(false)} />}
       {showAccessRequests && <AccountRequestsDialog open />}
       <PageHeader title="Dashboard" description="Plan, prioritize, and accomplish your property tasks with ease."
-        action={<button className="dashboard-export" type="button" disabled><Icon name="download" />Export Data</button>} />
+        action={<button className="dashboard-export" type="button" onClick={() => { setExportMounted(true); setExportOpen(true); }}><Icon name="download" />Export Data</button>} />
       {retry}
       <section className="dashboard-summary" aria-label="Workspace summary">{cards.map(card => <article
         className={`dashboard-summary__item${card.financial ? ' dashboard-summary__item--financial' : ''}`} key={card.label}>
@@ -162,22 +167,22 @@ export function DashboardOverview({ role, showAccessRequests = false }: { role: 
       </section>
     </div>;
   }
-  const invoice = data?.next_invoice as Record<string,unknown> | undefined;
-  const tenantName = typeof data?.display_name === 'string' ? data.display_name : typeof data?.name === 'string' ? data.name : 'Tenant';
+  const tenantFullName = typeof data?.display_name === 'string' ? data.display_name.trim() : typeof data?.name === 'string' ? data.name.trim() : '';
+  const tenantName = tenantFullName.split(/\s+/)[0] || 'Tenant';
   const shortcuts = [
     { title:'My Details', text:'Personal and stay information', href:'/tenant/details', icon:'users' as const },
     { title:'Payments', text:'Billing information and history', href:'/tenant/payments', icon:'wallet' as const },
     { title:'Maintenance', text:'Requests and updates', href:'/tenant/maintenance', icon:'wrench' as const },
     { title:'Concerns & Suggestions', text:'Share feedback with the team', href:'/tenant/concerns', icon:'sparkles' as const },
   ];
-  return <div className="tenant-home"><section className="tenant-home-summary tenant-home-summary--welcome"><div><h1>Welcome back, {tenantName}!</h1><p>Manage your stay and keep track of your dormitory activities.</p></div>
-      <div className="tenant-home-summary__facts"><div><span>Your room</span><strong>{text(data?.room)}</strong></div><div><span>Monthly rent</span><strong>{invoice ? `${invoice.currency} ${invoice.amount}` : '—'}</strong></div></div>
+  return <div className="tenant-home"><section className="tenant-home-summary tenant-home-summary--welcome"><div><h1><span className="tenant-greeting-desktop">Welcome back, {tenantName}!</span><span className="tenant-greeting-mobile">Hello, <strong>{tenantName}!</strong></span></h1><p>Manage your stay and keep track of your dormitory activities.</p></div>
+      <div className="tenant-home-summary__facts"><div><span>Your room</span><strong>{text(data?.room)}</strong></div><div><span>Monthly rent</span><strong>{formatTenantMonthlyRent(data?.monthly_rent as number | string | null | undefined)}</strong></div></div>
     </section>{retry}
     <section className="tenant-home-shortcuts" aria-labelledby="tenant-shortcuts-title"><div className="tenant-section-heading"><div><h2 id="tenant-shortcuts-title">Quick Access</h2><p>Common details and services.</p></div></div>
-      <div className="tenant-shortcut-grid">{shortcuts.map(item => <Link className="tenant-shortcut" href={item.href} key={item.href}><span className="tenant-summary-icon"><Icon name={item.icon} /></span><span><strong>{item.title}</strong><small>{item.text}</small></span><Icon name="chevron" className="tenant-shortcut__chevron" /></Link>)}</div>
+      <div className="tenant-shortcut-grid">{shortcuts.map(item => <Link className="tenant-shortcut" href={item.href} key={item.href}><span className="tenant-summary-icon"><Icon name={item.icon} /></span><span><strong>{item.title === 'Concerns & Suggestions' ? <><span className="tenant-shortcut-desktop-label">{item.title}</span><span className="tenant-shortcut-mobile-label">Concerns</span></> : item.title}</strong><small>{item.text}</small></span><Icon name="chevron" className="tenant-shortcut__chevron" /></Link>)}</div>
     </section>
     <section className="tenant-recent"><div className="tenant-recent__header"><h2>Recent Notifications</h2><Link href="/tenant/notifications">View All</Link></div>
-      {recent.length ? <div className="tenant-recent-list">{recent.slice(0,3).map(row => <Link href={text(row.href)} key={String(row.id)}><span className="tenant-recent-list__icon"><Icon name="receipt" /></span><span className="tenant-recent-list__copy"><strong>{text(row.title)}</strong><small>{text(row.body)}</small></span><time>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString() : ''}</time></Link>)}</div>
+      {recent.length ? <div className="tenant-recent-list">{recent.slice(0,8).map(row => <Link href={text(row.href)} key={String(row.id)}><span className="tenant-recent-list__icon"><Icon name="receipt" /></span><span className="tenant-recent-list__copy"><strong>{text(row.title)}</strong><small>{text(row.body)}</small></span><time>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString() : ''}</time></Link>)}</div>
         : <div className="tenant-empty-inline"><span className="tenant-summary-icon"><Icon name="bell" /></span><div><strong>No notifications to display</strong><p>New account updates will appear here.</p></div></div>}
     </section>
   </div>;

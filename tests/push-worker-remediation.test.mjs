@@ -8,12 +8,12 @@ function moduleAt(path,modules={}){
  const exports={};vm.runInNewContext(ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
  {exports,require:n=>{assert.ok(n in modules,n);return modules[n]},AbortController,AbortSignal,Buffer,Date,Promise,setTimeout,clearTimeout,process:{env:{}}});return exports;
 }
-function worker({hang,malicious=false,badConfig=false}={}){
- const calls=[],signals=[];let sends=0;const claims=Array.from({length:4},(_,i)=>({id:String(i),token:'claim'}));
+function worker({hang,malicious=false,badConfig=false,total=4}={}){
+ const calls=[],signals=[];let sends=0,claimed=0;const claims=Array.from({length:total},(_,i)=>({id:String(i),token:'claim'}));
  const client={rpc:(name,args)=>({abortSignal:signal=>{
   calls.push({name,args});signals.push({name,signal});
   if(name===hang)return new Promise(()=>{});
-  if(name==='mapsilip_push_claim')return Promise.resolve({data:claims,error:null});
+  if(name==='mapsilip_push_claim'){const page=claims.slice(claimed,claimed+args.p_limit);claimed+=page.length;return Promise.resolve({data:page,error:null})}
   if(name==='mapsilip_push_delivery_check')return Promise.resolve({data:{id:args.p_id,token:args.p_token,attempt:1,notificationId:'notice',category:'payments',role:'tenant',ttl:100,subscription:{endpoint:'https://fcm.googleapis.com/device'+args.p_id}},error:null});
   return Promise.resolve({data:claims.length,error:null});
  }})};
@@ -37,4 +37,11 @@ for(const stage of ['mapsilip_push_claim','mapsilip_push_delivery_check','mapsil
  if(stage==='mapsilip_push_claim')await assert.rejects(w.run());else {const result=await w.run();assert.equal(result.deferred,4);assert.equal(w.calls.at(-1).name,'mapsilip_push_release');assert.equal(w.calls.at(-1).args.p_claims.length,4)}
  assert.ok(Date.now()-started<3500);assert.ok(w.signals.filter(s=>s.name===stage).every(s=>s.signal.aborted));
  if(stage!=='mapsilip_push_finish')assert.equal(w.sends(),0);
+});
+
+test('a 90-device burst drains in one invocation with bounded claim pages',async()=>{
+ const w=worker({total:90});const result=await w.run();assert.equal(result.accepted,90);assert.equal(w.sends(),90);assert.ok(w.calls.filter(c=>c.name==='mapsilip_push_claim').every(c=>c.args.p_limit<=20));
+});
+test('one invocation never exceeds 100 device deliveries',async()=>{
+ const w=worker({total:140});const result=await w.run();assert.equal(result.accepted,100);assert.equal(w.sends(),100);
 });
