@@ -91,7 +91,7 @@ function TenantToolbar({ authEnabled }: { authEnabled: boolean }) {
   </div>;
 }
 
-function NavLinks({ area, mobile = false, collapsed = false, hidden = false }: { area: Area; mobile?: boolean; collapsed?: boolean; hidden?: boolean }) {
+function NavLinks({ area, mobile = false, collapsed = false }: { area: Area; mobile?: boolean; collapsed?: boolean }) {
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
   const highlightRef = useRef<HTMLSpanElement>(null);
@@ -135,9 +135,7 @@ function NavLinks({ area, mobile = false, collapsed = false, hidden = false }: {
   return (
     <nav
       ref={navRef}
-      className={`${mobile ? "mobile-nav" : "side-nav"}${mobile && hidden ? " mobile-nav--hidden" : ""}`}
-      aria-hidden={mobile && hidden ? true : undefined}
-      inert={mobile && hidden ? true : undefined}
+      className={mobile ? "mobile-nav" : "side-nav"}
       id={mobile ? undefined : "desktop-primary-navigation"}
       aria-label={mobile
         ? "Primary navigation"
@@ -246,7 +244,8 @@ export function AppShell(
   const isTenant = area === "tenant";
   const pathname = usePathname();
   const mainContentRef = useRef<HTMLElement>(null);
-  const [mobileNavHidden, setMobileNavHidden] = useState(false);
+  const mobileTopbarRef = useRef<HTMLElement>(null);
+  const [mobileTopbarHidden, setMobileTopbarHidden] = useState(false);
 
   useEffect(() => {
     const main = mainContentRef.current;
@@ -264,7 +263,7 @@ export function AppShell(
 
       if (top < 12) {
         accumulatedDelta = 0;
-        setMobileNavHidden(false);
+        setMobileTopbarHidden(false);
         return;
       }
       if (Math.abs(delta) < 1) return;
@@ -275,10 +274,10 @@ export function AppShell(
       accumulatedDelta += delta;
 
       if (accumulatedDelta >= 12) {
-        setMobileNavHidden(true);
+        if (!mobileTopbarRef.current?.contains(document.activeElement)) setMobileTopbarHidden(true);
         accumulatedDelta = 0;
       } else if (accumulatedDelta <= -8) {
-        setMobileNavHidden(false);
+        setMobileTopbarHidden(false);
         accumulatedDelta = 0;
       }
     };
@@ -287,12 +286,12 @@ export function AppShell(
     return () => main.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => setMobileNavHidden(false), [pathname]);
+  useEffect(() => setMobileTopbarHidden(false), [pathname]);
 
   return (
-    <div className={`app-shell app-shell--${area}`}>
+    <div className={`app-shell app-shell--${area}${mobileTopbarHidden ? " app-shell--topbar-hidden" : ""}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <header className="mobile-topbar">
+      <header ref={mobileTopbarRef} className="mobile-topbar" aria-hidden={mobileTopbarHidden ? true : undefined} inert={mobileTopbarHidden ? true : undefined}>
         <Brand area={area} />
         <div className="mobile-topbar__actions"><ThemeToggle />
           <ToolbarPopovers area={area} compact staffAuthEnabled={staffAuthEnabled} tenantAuthEnabled={tenantAuthEnabled} />
@@ -313,7 +312,7 @@ export function AppShell(
         </div>
       </main>
 
-      <NavLinks area={area} mobile hidden={mobileNavHidden} />
+      <NavLinks area={area} mobile />
       {authenticatedUserId && <PwaManager key={authenticatedUserId} userId={authenticatedUserId} pushEnabled={pushEnabled} />}
     </div>
   );
