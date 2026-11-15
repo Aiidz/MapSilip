@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { isNavigationItemActive } from "../lib/navigation.mjs";
 import { PwaManager } from "./PwaManager";
 import { SidebarProfileCard } from "./SidebarProfileCard";
@@ -243,6 +243,39 @@ export function AppShell(
 ) {
   const isTenant = area === "tenant";
   const pathname = usePathname();
+  const mainRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    const header = headerRef.current;
+    if (!main || !header) return;
+    const mobile = window.matchMedia('(max-width: 999px)');
+    let previousTop = main.scrollTop;
+    let offset = 0;
+    const reveal = () => {
+      offset = 0;
+      header.style.transform = 'translateY(0)';
+    };
+    reveal();
+    const onScroll = () => {
+      // Clamp elastic overscroll so bouncing at the bottom cannot reveal the header.
+      const top = Math.max(0, Math.min(main.scrollTop, main.scrollHeight - main.clientHeight));
+      const delta = top - previousTop;
+      previousTop = top;
+      if (!mobile.matches || header.contains(document.activeElement)) return reveal();
+      offset = top <= 0 ? 0 : Math.max(0, Math.min(header.offsetHeight, offset + delta));
+      header.style.transform = `translateY(${-offset}px)`;
+    };
+    main.addEventListener('scroll', onScroll, { passive: true });
+    header.addEventListener('focusin', reveal);
+    mobile.addEventListener('change', reveal);
+    return () => {
+      main.removeEventListener('scroll', onScroll);
+      header.removeEventListener('focusin', reveal);
+      mobile.removeEventListener('change', reveal);
+    };
+  }, [pathname]);
 
   return (
     <div className={`app-shell app-shell--${area}`}>
@@ -250,8 +283,8 @@ export function AppShell(
 
       <DesktopSidebar area={area} />
 
-      <main className="main-content" id="main-content" tabIndex={-1}>
-        <header className="mobile-topbar">
+      <main ref={mainRef} className="main-content" id="main-content" tabIndex={-1}>
+        <header ref={headerRef} className="mobile-topbar">
           <Brand area={area} />
           <div className="mobile-topbar__actions"><ThemeToggle />
             <ToolbarPopovers area={area} compact staffAuthEnabled={staffAuthEnabled} tenantAuthEnabled={tenantAuthEnabled} />

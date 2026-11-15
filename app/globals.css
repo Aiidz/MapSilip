@@ -1415,7 +1415,7 @@ html {
     overscroll-behavior-y: contain;
     padding-bottom: 24px;
   }
-  .main-content > .mobile-topbar { position: static; top: auto; }
+  .main-content > .mobile-topbar { position: sticky; top: 0; transition: none; }
   .main-content::after { content: ""; display: block; height: calc(88px + env(safe-area-inset-bottom)); }
 }
 
