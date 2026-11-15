@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { isNavigationItemActive } from "../lib/navigation.mjs";
 import { PwaManager } from "./PwaManager";
 import { SidebarProfileCard } from "./SidebarProfileCard";
@@ -91,7 +91,7 @@ function TenantToolbar({ authEnabled }: { authEnabled: boolean }) {
   </div>;
 }
 
-function NavLinks({ area, mobile = false, collapsed = false }: { area: Area; mobile?: boolean; collapsed?: boolean }) {
+function NavLinks({ area, mobile = false, collapsed = false, hidden = false }: { area: Area; mobile?: boolean; collapsed?: boolean; hidden?: boolean }) {
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
   const highlightRef = useRef<HTMLSpanElement>(null);
@@ -135,7 +135,9 @@ function NavLinks({ area, mobile = false, collapsed = false }: { area: Area; mob
   return (
     <nav
       ref={navRef}
-      className={mobile ? "mobile-nav" : "side-nav"}
+      className={`${mobile ? "mobile-nav" : "side-nav"}${mobile && hidden ? " mobile-nav--hidden" : ""}`}
+      aria-hidden={mobile && hidden ? true : undefined}
+      inert={mobile && hidden ? true : undefined}
       id={mobile ? undefined : "desktop-primary-navigation"}
       aria-label={mobile
         ? "Primary navigation"
@@ -243,6 +245,50 @@ export function AppShell(
 ) {
   const isTenant = area === "tenant";
   const pathname = usePathname();
+  const mainContentRef = useRef<HTMLElement>(null);
+  const [mobileNavHidden, setMobileNavHidden] = useState(false);
+
+  useEffect(() => {
+    const main = mainContentRef.current;
+    if (!main) return;
+
+    let previousTop = main.scrollTop;
+    let accumulatedDelta = 0;
+    let previousDirection = 0;
+    const mobile = window.matchMedia("(max-width: 999px)");
+    const handleScroll = () => {
+      if (!mobile.matches) return;
+      const top = Math.max(0, main.scrollTop);
+      const delta = top - previousTop;
+      previousTop = top;
+
+      if (top < 12) {
+        accumulatedDelta = 0;
+        setMobileNavHidden(false);
+        return;
+      }
+      if (Math.abs(delta) < 1) return;
+
+      const direction = Math.sign(delta);
+      if (direction !== previousDirection) accumulatedDelta = 0;
+      previousDirection = direction;
+      accumulatedDelta += delta;
+
+      if (accumulatedDelta >= 12) {
+        setMobileNavHidden(true);
+        accumulatedDelta = 0;
+      } else if (accumulatedDelta <= -8) {
+        setMobileNavHidden(false);
+        accumulatedDelta = 0;
+      }
+    };
+
+    main.addEventListener("scroll", handleScroll, { passive: true });
+    return () => main.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => setMobileNavHidden(false), [pathname]);
+
   return (
     <div className={`app-shell app-shell--${area}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
@@ -255,7 +301,7 @@ export function AppShell(
 
       <DesktopSidebar area={area} />
 
-      <main className="main-content" id="main-content" tabIndex={-1}>
+      <main ref={mainContentRef} className="main-content" id="main-content" tabIndex={-1}>
         {isTenant && <TenantToolbar authEnabled={tenantAuthEnabled} />}
         <div className="content-wrap">
           {!isTenant && <ManagementToolbar area={area} staffAuthEnabled={staffAuthEnabled} />}
@@ -267,7 +313,7 @@ export function AppShell(
         </div>
       </main>
 
-      <NavLinks area={area} mobile />
+      <NavLinks area={area} mobile hidden={mobileNavHidden} />
       {authenticatedUserId && <PwaManager key={authenticatedUserId} userId={authenticatedUserId} pushEnabled={pushEnabled} />}
     </div>
   );
