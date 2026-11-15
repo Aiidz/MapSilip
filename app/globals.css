@@ -7043,8 +7043,8 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
   .room-management--map .building-experience__floors button.is-active { border-color: transparent; color: #fff; background: var(--slate); }
   .room-management--map .building-experience__floors button { min-width: 0; min-height: 40px; flex: 1; padding-inline: 8px; font-size: 12px; white-space: nowrap; }
   .room-management--map .building-experience__floors .building-experience__reset { display: none; }
-  .room-management--map .building-experience__layout { display: flex; min-height: 280px; flex: 1; flex-direction: column; padding: 12px; }
-  .room-management--map .building-experience__stage { width: 100%; min-height: 280px; height: auto; flex: 1; align-self: stretch; border-color: transparent; border-radius: 14px; }
+  .room-management--map .building-experience__layout { display: flex; min-height: clamp(480px, 68dvh, 680px); flex: 1; flex-direction: column; padding: 12px; }
+  .room-management--map .building-experience__stage { width: 100%; min-height: 0; height: auto; flex: 1; align-self: stretch; border-color: transparent; border-radius: 14px; }
   .room-management--map .building-experience__stage .isometric-building { height: 100%; }
   .room-management--map .building-experience__stage-message { min-height: 0; height: 100%; }
   .room-management--map .building-experience__legend { display: none; }
