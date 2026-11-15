@@ -144,7 +144,8 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
     ? assignments.filter(row => row.room_id === selectedRoom.id && !row.ended_on).length : null;
 
   const isMobile = useSyncExternalStore(subscribeViewport, mobileSnapshot, serverSnapshot);
-  const minZoom = isMobile ? 1.25 : 1;
+  const floorInspection = selectedFloor === '2nd Floor' || selectedFloor === '3rd Floor';
+  const minZoom = isMobile ? (floorInspection ? 1.65 : 1.25) : 1;
   const mapZoom = Math.max(zoom, minZoom);
 
   function chooseFloor(label: string | null) {
