@@ -1416,6 +1416,9 @@ html {
     padding-bottom: 24px;
   }
   .main-content > .mobile-topbar { position: sticky; top: 0; transition: none; }
+  /* The sticky header must start at the scrollport edge to slide completely out. */
+  .app-shell #main-content { padding-top: 0; padding-inline: 0; }
+  .app-shell #main-content > .content-wrap { padding-inline: 18px; }
   .main-content::after { content: ""; display: block; height: calc(88px + env(safe-area-inset-bottom)); }
 }
 
