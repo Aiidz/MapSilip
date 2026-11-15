@@ -129,14 +129,16 @@ export function PreviewCard({
   description,
   href,
   icon,
+  onClick,
 }: {
   title: string;
   description?: string;
   href: string;
   icon: IconName;
+  onClick?: () => void;
 }) {
-  return (
-    <Link className="preview-card" href={href}>
+  const content = (
+    <>
       <span className="preview-card__icon">
         <Icon name={icon} />
       </span>
@@ -145,8 +147,11 @@ export function PreviewCard({
         {description ? <span>{description}</span> : null}
       </span>
       <Icon name="chevron" className="preview-card__chevron" />
-    </Link>
+    </>
   );
+  return onClick
+    ? <button className="preview-card preview-card--action" type="button" onClick={onClick}>{content}</button>
+    : <Link className="preview-card" href={href}>{content}</Link>;
 }
 
 export function StatPanel(

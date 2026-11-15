@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const client = await createSupabaseServerClient('read-write');
     const { data: { user }, error: userError } = await client.auth.getUser();
     if (userError || !user?.id) throw new BackendError('unauthenticated');
-    const { error } = await client.auth.signOut({ scope: 'global' });
+    const { error } = await client.auth.signOut({ scope: 'local' });
     if (error) throw new BackendError('unavailable');
     return NextResponse.json({ state: 'signed-out' }, { headers: noStoreHeaders() });
   } catch (error) {

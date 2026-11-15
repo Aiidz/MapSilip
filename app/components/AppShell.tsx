@@ -262,13 +262,13 @@ export function AppShell(
           <PortalPageContent pathname={pathname}>{children}</PortalPageContent>
           <footer className="page-footer">
             <span>MapSilip</span>
-            {authenticatedUserId && <PwaManager key={authenticatedUserId} userId={authenticatedUserId} pushEnabled={pushEnabled} />}
             <span>Designed for dorm life, wherever you are.</span>
           </footer>
         </div>
       </main>
 
       <NavLinks area={area} mobile />
+      {authenticatedUserId && <PwaManager key={authenticatedUserId} userId={authenticatedUserId} pushEnabled={pushEnabled} />}
     </div>
   );
 }

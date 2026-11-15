@@ -7,10 +7,16 @@ import {
   useEffect,
   useId,
   useRef,
+  useSyncExternalStore,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
+
+const subscribeToPortal = () => () => {};
+const getPortalSnapshot = () => true;
+const getServerPortalSnapshot = () => false;
 
 type OverlayVariant = 'dialog' | 'drawer';
 
@@ -47,6 +53,7 @@ export function ResponsiveOverlay({
   className = '',
 }: ResponsiveOverlayProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const portalReady = useSyncExternalStore(subscribeToPortal, getPortalSnapshot, getServerPortalSnapshot);
   const pushedRef = useRef(false);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
@@ -125,7 +132,7 @@ export function ResponsiveOverlay({
         window.history.back();
       }
     }
-  }, [open]);
+  }, [open, portalReady]);
 
   useEffect(() => {
     function handlePopState() {
@@ -146,7 +153,9 @@ export function ResponsiveOverlay({
     if (event.target === dialogRef.current) requestClose();
   }
 
-  return (
+  if (!portalReady) return null;
+
+  return createPortal((
     <dialog
       ref={dialogRef}
       className={`ps-overlay ps-overlay--${variant} ${className}`.trim()}
@@ -176,5 +185,5 @@ export function ResponsiveOverlay({
       </header>
       <div className="ps-overlay__body">{children}</div>
     </dialog>
-  );
+  ), document.body);
 }

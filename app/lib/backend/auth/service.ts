@@ -164,7 +164,7 @@ export async function completeFirstLogin(dependencies: StaffAuthDependencies, in
   }
 }
 
-/** Revokes the database grant before global Auth sign-out so a surviving access JWT cannot keep portal access. */
+/** Revokes the current session grant before Auth sign-out so a surviving access JWT cannot keep portal access. */
 export async function staffSignOut(dependencies: Pick<StaffAuthDependencies, 'auth' | 'revokeSessionAdmission'>) {
   let current: Readonly<{ identity: VerifiedIdentity; email: string }>;
   try { current = await dependencies.auth.verifyCurrentSession(); }

@@ -913,6 +913,8 @@ html {
   padding: 9px 10px;
   transition: border-color .16s ease, background .16s ease, transform .16s ease;
 }
+.preview-card--action { width: 100%; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.preview-card--action:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .preview-card:hover {
   transform: translateX(2px);
   border-color: var(--border);
@@ -2872,9 +2874,9 @@ button.room-context__person:hover, button.room-context__person:focus-visible { b
   .caretaker-maintenance-layout .empty-state { min-height: 145px; }
   .caretaker-profile-summary { grid-row: 1; }
   .app-shell--caretaker { grid-template-rows: auto minmax(0, 1fr) auto; }
-  .app-shell--caretaker .mobile-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .app-shell--caretaker .mobile-nav .nav-link { min-height: 58px; padding-inline: 3px; }
-  .app-shell--caretaker .mobile-nav .nav-link span { font-size: 11px; }
+  .app-shell .mobile-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); border-radius: 18px; }
+  .app-shell .mobile-nav .nav-link { min-height: 44px; }
+  .app-shell .mobile-nav .nav-link > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 @media (max-width: 420px) {
   .caretaker-summary__card h2 { font-size: 12px; }
@@ -6669,9 +6671,9 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
   .tenant-home .tenant-recent-list { max-height: 350px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
   .tenant-home .tenant-recent-list a { min-height: 58px; background: var(--surface); border: 1px solid var(--border); }
   .tenant-home .tenant-recent-list__icon { display: grid; place-items: center; width: 34px; height: 38px; border-radius: 7px; background: var(--surface-soft); }
-  .app-shell--tenant .mobile-nav { border-radius: 18px; }
-  .app-shell--tenant .mobile-nav .nav-link { min-height: 44px; }
-  .app-shell--tenant .mobile-nav .nav-link > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .app-shell .mobile-nav { border-radius: 18px; }
+  .app-shell .mobile-nav .nav-link { min-height: 44px; }
+  .app-shell .mobile-nav .nav-link > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 @media (width >= 768px) {
   .tenant-home .tenant-recent-list > a:nth-child(n+4) { display: none; }
@@ -6741,6 +6743,49 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
   .tenant-contract-card dl { gap: 5px; }
   .tenant-contract-document { min-height: 32px; gap: 7px; margin-top: 8px; padding: 6px 8px; border-radius: 9px; font-size: 9.5px; }
   .tenant-contract-document svg { width: 13px; height: 13px; }
+}
+
+@media (width < 768px) {
+  .app-shell--tenant:has(.tenant-workspace--concerns) .main-content { padding: 20px 0 16px; }
+  .app-shell--tenant:has(.tenant-workspace--concerns) .content-wrap { padding-inline: 18px; }
+  .app-shell--tenant:has(.tenant-workspace--concerns) .page-footer { display: none; }
+  .tenant-workspace--concerns { display: flex; flex-direction: column; gap: 24px; min-height: calc(100dvh - 176px); }
+  .tenant-workspace--concerns .page-header { margin: 0; }
+  .tenant-workspace--concerns .page-header h1 { font-size: 27px; line-height: 1.25; font-weight: 750; }
+  .tenant-workspace--concerns .page-header p { display: none; }
+  .tenant-workspace--concerns .tenant-share-panel { gap: 14px; margin: 0; padding: 20px; border-radius: 18px; }
+  .tenant-workspace--concerns .tenant-overview-content { gap: 14px; }
+  .tenant-workspace--concerns .tenant-summary-icon { width: 54px; height: 54px; }
+  .tenant-workspace--concerns .tenant-summary-icon svg { width: 25px; height: 25px; }
+  .tenant-workspace--concerns .tenant-share-panel h2 { font-size: 25px; line-height: 1.3; }
+  .tenant-workspace--concerns .tenant-share-panel p { font-size: 13px; line-height: 1.5; }
+  .tenant-workspace--concerns .tenant-hero-action { min-height: 44px; font-size: 14px; }
+  .tenant-workspace--concerns .tenant-record-layout { display: block; flex: 1; min-height: 0; }
+  .tenant-workspace--concerns .tenant-record-layout > .panel { min-height: 320px; margin: 0; padding: 14px; border-radius: 18px; }
+  .tenant-workspace--concerns .tenant-record-layout > .panel .panel__header { margin-bottom: 12px; }
+  .tenant-workspace--concerns .tenant-record-layout > .panel .panel__header h2 { font-size: 17px; line-height: 1.4; }
+  .tenant-workspace--concerns .tenant-filter-row { gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tenant-workspace--concerns .tenant-filter { min-height: 36px; padding: 6px 10px; font-size: 12px; }
+  .tenant-workspace--concerns .tenant-record-items { gap: 10px; margin-top: 0; }
+  .tenant-workspace--concerns .tenant-record-item { min-height: 76px; gap: 6px 10px; padding: 12px; border-radius: 12px; }
+  .tenant-workspace--concerns .tenant-record-item strong { font-size: 14px; line-height: 1.4; }
+  .tenant-workspace--concerns .tenant-record-item span,
+  .tenant-workspace--concerns .tenant-record-item small { font-size: 12px; }
+  .tenant-workspace--concerns .mobile-record-details .tenant-detail-panel { display: block; min-height: 0; margin: 0; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .tenant-workspace--concerns .mobile-record-details .tenant-detail-panel > .panel__header { display: none; }
+  .tenant-workspace--concerns .mobile-record-details .tenant-selected-details { gap: 14px; margin: 0; font-size: 15px; line-height: 1.5; }
+  .tenant-workspace--concerns .mobile-record-details .tenant-selected-details div { grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 0 0 12px; border-bottom: 1px solid var(--border); }
+  .tenant-workspace--concerns .mobile-record-details .tenant-selected-details dt { font-size: 13px; }
+  .tenant-workspace--concerns .mobile-record-details .tenant-selected-details dd { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+  .tenant-submit-concern-overlay .tenant-form-panel { padding: 0; }
+  .tenant-submit-concern-overlay .ps-overlay__header { padding: 12px 18px 14px; }
+  .tenant-submit-concern-overlay .ps-overlay__header h2 { font-size: 20px; line-height: 1.3; }
+  .tenant-submit-concern-overlay .ps-overlay__body { padding: 18px 18px max(20px, env(safe-area-inset-bottom)); }
+  .tenant-submit-concern-overlay .tenant-modal-form { gap: 18px; }
+  .tenant-submit-concern-overlay .tenant-form-panel label { gap: 8px; font-size: 14px; line-height: 1.4; }
+  .tenant-submit-concern-overlay .tenant-form-panel textarea,
+  .tenant-submit-concern-overlay .tenant-form-panel select { min-height: 48px; padding: 10px 12px; border-radius: 11px; font-size: 16px; }
+  .tenant-submit-concern-overlay .tenant-modal-form .button { min-height: 48px; font-size: 15px; }
 }
 
 @media (width < 768px) {
@@ -6910,4 +6955,129 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
   .app-shell .tenant-my-details .tenant-details-card h3 { font-size: 17px; }
   .app-shell .tenant-my-details :is(dt, .tenant-contract-document) { font-size: 13px; }
   .app-shell .tenant-my-details dd { font-size: 15px; line-height: 1.5; }
+}
+
+/* Admin payment records use the tenant mobile spacing and type scale. */
+@media (width < 768px) {
+  .app-shell--management:has(.management-payments) .main-content { padding: 20px 0 16px; }
+  .app-shell--management:has(.management-payments) .content-wrap { padding-inline: 18px; }
+  .app-shell--management:has(.management-payments) .page-footer { display: none; }
+  .management-payments { display: flex; flex-direction: column; gap: 24px; min-height: calc(100dvh - 176px); }
+  .management-payments .page-header { margin: 0; }
+  .management-payments .page-header h1 { font-size: 27px; line-height: 1.25; font-weight: 750; }
+  .management-payments .page-header p,
+  .management-payments .page-header__action { display: none; }
+  .payment-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
+  .payment-summary__card { min-height: 112px; padding: 15px; border-radius: 16px; }
+  .payment-summary__card > span:first-child { max-width: calc(100% - 30px); font-size: 13px; line-height: 1.4; }
+  .payment-summary__card strong { margin-top: 5px; font-size: 25px; line-height: 1.3; }
+  .payment-summary__card small { margin-top: 5px; font-size: 12px; line-height: 1.4; }
+  .payment-summary__mark { top: 10px; right: 10px; width: 24px; height: 24px; }
+  .payment-board { display: flex; flex: 1; min-height: 0; }
+  .payment-list-column { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 14px; }
+  .payment-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .payment-filter--search { grid-column: 1 / -1; min-height: 44px; padding-inline: 10px; }
+  .payment-filter--search input { font-size: 14px; }
+  .payment-dropdown { min-width: 0; }
+  .payment-dropdown > summary { min-height: 44px; gap: 6px; padding: 0 9px; font-size: 12px; }
+  .payment-table-panel { flex: 1; min-height: 380px; overflow: hidden; border-radius: 18px; }
+  .payment-table-scroll { overflow-x: auto; }
+  .payment-table { min-width: 0; }
+  .payment-table th { height: 48px; padding: 0 6px; font-size: 12px; }
+  .payment-table th:first-child { width: 33%; }
+  .payment-table th:nth-child(2) { width: 21%; }
+  .payment-table th:nth-child(3) { width: 24%; }
+  .payment-table th:nth-child(4) { width: 22%; }
+  .payment-table td { font-size: 12px; }
+  .payment-row-select { min-height: 76px; gap: 8px; padding: 12px 6px; }
+  .payment-row-select .payment-tenant-avatar { width: 28px; height: 28px; flex: 0 0 28px; }
+  .payment-row-select strong { display: block; overflow: hidden; font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+  .payment-row-select small { display: block; font-size: 12px; line-height: 1.4; }
+  .payment-table td:nth-child(2), .payment-table td:nth-child(3) { padding: 10px 5px; font-size: 12px; }
+  .payment-submitted-time { display: block; font-size: 12px; }
+  .payment-table td:last-child { padding-inline: 4px; }
+  .payment-table .payment-status { min-width: 0; padding: 4px 7px; font-size: 12px; line-height: 1.35; white-space: nowrap; }
+  .payment-empty { min-height: 320px; }
+}
+
+@media (max-width: 767px) {
+  .management-payments .mobile-record-details .payment-details-panel { display: flex; min-height: 0; overflow: visible; flex-direction: column; border: 0; border-radius: 0; background: transparent; }
+  .management-payments .mobile-record-details .payment-details-panel > h2,
+  .management-payments .mobile-record-details .payment-detail-close { display: none; }
+  .management-payments .mobile-record-details .payment-selected-details { min-height: 0; gap: 16px; padding: 0; }
+  .management-payments .mobile-record-details .payment-detail-identity { margin: 0 0 4px; }
+  .management-payments .mobile-record-details .payment-selected-details h3 { margin: 0 0 8px; font-size: 17px; line-height: 1.4; }
+  .management-payments .mobile-record-details .payment-information { gap: 12px; }
+  .management-payments .mobile-record-details .payment-information > div { font-size: 15px; line-height: 1.5; }
+  .management-payments .mobile-record-details .payment-proof { min-height: 76px; border-radius: 12px; font-size: 14px; }
+  .management-payments .mobile-record-details .payment-review-result { padding: 14px; border-radius: 12px; }
+  .management-payments .mobile-record-details .payment-detail-form { margin-top: 0; padding: 0; }
+  .management-payments .mobile-record-details .payment-review-actions { gap: 10px; }
+  .management-payments .mobile-record-details .payment-review-actions .button { min-height: 48px; font-size: 14px; }
+}
+
+/* Room Management mobile map: keep the controls readable and give the map the remaining height. */
+@media (width < 768px) {
+  .app-shell--management:has(.room-management--map) .main-content { padding: 20px 0 16px; }
+  .app-shell--management:has(.room-management--map) .content-wrap { padding-inline: 18px; }
+  .room-management--map { display: flex; min-height: calc(100dvh - 176px); flex-direction: column; gap: 16px; }
+  .room-management--map .page-header { flex-direction: column; align-items: stretch; gap: 10px; margin: 0; }
+  .room-management--map .page-header h1 { font-size: 27px; line-height: 1.25; font-weight: 750; }
+  .room-management--map .page-header p { display: none; }
+  .room-management--map .page-header__action,
+  .room-management--map .room-management__export { display: flex; width: 100%; }
+  .room-management--map .room-management__export { min-height: 44px; font-size: 13px; }
+  .room-management--map .room-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+  .room-management--map .room-summary__card { min-height: 94px; gap: 3px; border-radius: 14px; padding: 10px 12px; }
+  .room-management--map .room-summary__title { max-width: calc(100% - 26px); font-size: 12px; line-height: 1.35; }
+  .room-management--map .room-summary__card strong { margin-top: 1px; font-size: 25px; line-height: 1.3; }
+  .room-management--map .room-summary__card small { font-size: 12px; line-height: 1.35; }
+  .room-management--map .room-summary__mark { top: 8px; right: 8px; width: 22px; height: 22px; }
+  .room-management--map .room-tabs { display: flex; width: 100%; margin: 0; }
+  .room-management--map .room-tabs button { min-height: 44px; flex: 1; justify-content: center; gap: 7px; padding-inline: 10px; font-size: 13px; }
+  .room-management--map .room-workspace--building { display: flex; min-height: 0; flex: 1; }
+  .room-management--map .building-experience { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; border: 1px solid var(--surface-admin-border); border-radius: 16px; background: var(--surface); }
+  .room-management--map .building-experience__top { display: none; }
+  .room-management--map .building-experience__floors { flex-wrap: nowrap; gap: 6px; margin: 8px 8px 0; border: 1px solid var(--surface-admin-border); border-radius: 18px; padding: 5px; background: var(--surface-soft); }
+  .room-management--map .building-experience__floors button:not(.building-experience__reset) { border-color: transparent; border-radius: 14px; background: transparent; }
+  .room-management--map .building-experience__floors button.is-active { border-color: transparent; color: #fff; background: var(--slate); }
+  .room-management--map .building-experience__floors button { min-width: 0; min-height: 40px; flex: 1; padding-inline: 8px; font-size: 12px; white-space: nowrap; }
+  .room-management--map .building-experience__floors .building-experience__reset { display: none; }
+  .room-management--map .building-experience__layout { display: flex; min-height: 280px; flex: 1; flex-direction: column; padding: 12px; }
+  .room-management--map .building-experience__stage { width: 100%; min-height: 280px; height: auto; flex: 1; align-self: stretch; border-color: transparent; border-radius: 14px; }
+  .room-management--map .building-experience__stage .isometric-building { height: 100%; }
+  .room-management--map .building-experience__stage-message { min-height: 0; height: 100%; }
+  .room-management--map .building-experience__legend { display: none; }
+}
+
+@media (width < 768px) {
+  .app-shell--management:has(.room-management--tenants) .main-content { padding: 20px 0 16px; }
+  .app-shell--management:has(.room-management--tenants) .content-wrap { padding-inline: 18px; }
+  .room-management--tenants { display: flex; min-height: calc(100dvh - 176px); flex-direction: column; gap: 20px; }
+  .room-management--tenants .page-header { flex-direction: column; align-items: stretch; gap: 10px; margin: 0; }
+  .room-management--tenants .page-header h1 { font-size: 27px; line-height: 1.25; font-weight: 750; }
+  .room-management--tenants .page-header p { display: none; }
+  .room-management--tenants .page-header__action,
+  .room-management--tenants .room-management__export { display: flex; width: 100%; }
+  .room-management--tenants .room-management__export { min-height: 44px; font-size: 13px; }
+  .room-management--tenants .room-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+  .room-management--tenants .room-summary__card { min-height: 94px; gap: 3px; border-radius: 14px; padding: 10px 12px; }
+  .room-management--tenants .room-summary__title { max-width: calc(100% - 26px); font-size: 12px; line-height: 1.35; }
+  .room-management--tenants .room-summary__card strong { margin-top: 1px; font-size: 25px; line-height: 1.3; }
+  .room-management--tenants .room-summary__card small { font-size: 12px; line-height: 1.35; }
+  .room-management--tenants .room-summary__mark { top: 8px; right: 8px; width: 22px; height: 22px; }
+  .room-management--tenants .room-tabs { display: flex; width: 100%; margin: 0; }
+  .room-management--tenants .room-tabs button { min-height: 44px; flex: 1; justify-content: center; gap: 7px; padding-inline: 10px; font-size: 13px; }
+  .room-management--tenants .tenant-list-workspace { display: flex; min-height: 0; flex: 1; }
+  .room-management--tenants .tenant-list-panel { display: flex; min-height: 320px; flex: 1; flex-direction: column; gap: 10px; overflow: hidden; border-radius: 18px; padding: 14px; }
+  .room-management--tenants .tenant-list-filter { flex: 0 0 auto; margin: 0; }
+  .room-management--tenants .tenant-list-filter__trigger { min-height: 44px; gap: 9px; padding-inline: 12px; font-size: 13px; }
+  .room-management--tenants .tenant-list-search { min-height: 44px; flex: 0 0 auto; }
+  .room-management--tenants .tenant-list-search input { font-size: 16px; }
+  .room-management--tenants .room-list-records { display: grid; min-height: 0; flex: 1; align-content: start; gap: 10px; overflow-y: auto; padding: 0; }
+  .room-management--tenants .room-list-record { min-height: 76px; gap: 10px; border-radius: 12px; padding: 12px; }
+  .room-management--tenants .room-list-avatar { width: 38px; height: 38px; flex-basis: 38px; }
+  .room-management--tenants .room-list-record strong { font-size: 14px; line-height: 1.4; }
+  .room-management--tenants .room-list-record small { font-size: 12px; line-height: 1.5; }
+  .room-management--tenants .tenant-list-empty { margin: auto 5px; font-size: 13px; }
 }

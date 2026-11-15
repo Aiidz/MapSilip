@@ -91,7 +91,7 @@ export function createSupabaseAuthGateway(
     },
     async signOutCurrent() {
       try {
-        const { error } = await current.client.auth.signOut({ scope: 'global' });
+        const { error } = await current.client.auth.signOut({ scope: 'local' });
         return Object.freeze({ confirmed: !error, cookies: Object.freeze([...current.writes]) });
       } catch {
         return Object.freeze({ confirmed: false, cookies: Object.freeze([]) });

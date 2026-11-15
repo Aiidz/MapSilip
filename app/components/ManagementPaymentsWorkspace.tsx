@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { createLatestRequest, fetchOperationRows } from '../lib/workspace-loading';
 import { Icon } from './Icon';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
+import { MobileDetailSurface } from './MobileDetailSurface';
 import { PageHeader } from './ui';
 
 type Row = Record<string,unknown>;
@@ -138,6 +139,7 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
         </tr>) : <tr><td colSpan={4}><div className="payment-empty"><span className="payment-empty__icon"><Icon name="fileSearch" /></span><strong>No payment submissions to display</strong><p>Payment records will appear here when available.</p></div></td></tr>}</tbody>
       </table></div>{count > 25 && <div className="operational-pagination"><button type="button" disabled={page===1} onClick={() => setPage(page-1)}>Previous</button><span>{page} / {Math.ceil(count/25)}</span><button type="button" disabled={page*25>=count} onClick={() => setPage(page+1)}>Next</button></div>}</section>
     </div>
+    <MobileDetailSurface open={Boolean(selected)} onClose={() => setSelected(null)} title="Payment Details">
     <section className="payment-details-panel" aria-labelledby="payment-details-title"><h2 id="payment-details-title">Payment Details</h2>
       {selected ? <div className="payment-selected-details">
         <button className="payment-detail-close" type="button" aria-label="Close payment details" onClick={() => setSelected(null)}><CloseIcon /></button>
@@ -157,6 +159,7 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
         </form> : <div className={`payment-review-result payment-review-result--${selected.status}`}><strong>{selected.status === 'approved' ? '✓ Payment Verified' : 'ⓘ Payment Rejected'}</strong><p>{selected.status === 'approved' ? 'This payment has been confirmed by the admin.' : 'Please contact the admin regarding your payment submission.'}</p>{Boolean(selected.review_note) && <p>{show(selected.review_note)}</p>}</div>}
       </div> : <div className="payment-details-empty"><span className="payment-details-empty__icon"><Icon name="fileSearch" /></span><strong>No Payment Selected</strong><p>Select a payment record to view details and review payment proof.</p></div>}
     </section>
+    </MobileDetailSurface>
     <ResponsiveOverlay
       open={creating}
       onClose={() => setCreating(false)}

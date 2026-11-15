@@ -133,7 +133,7 @@ function SubmissionForm({ kind, invoices, roomLabel, open, onClose, onSaved }: {
     onClose={close}
     title={kind === 'payments' ? 'Submit payment proof' : kind === 'maintenance' ? 'New maintenance request' : 'New concern or suggestion'}
     variant="dialog"
-    className={kind === 'payments' ? 'tenant-submit-payment-overlay' : kind === 'maintenance' ? 'tenant-submit-maintenance-overlay' : ''}
+    className={kind === 'payments' ? 'tenant-submit-payment-overlay' : kind === 'maintenance' ? 'tenant-submit-maintenance-overlay' : 'tenant-submit-concern-overlay'}
   >
     <div className="tenant-form-panel tenant-form-panel--bare">
       <form onSubmit={submit} className="tenant-modal-form">
@@ -364,7 +364,7 @@ export function TenantWorkspace({ kind }: { kind: Kind }) {
         </button>)}</div> : <EmptyState title="No records to display" description="Your submissions will appear here when available." icon={kind === 'maintenance' ? 'wrench' : 'sparkles'} />}
         {count > 25 && <div className="operational-pagination"><button type="button" disabled={page === 1} onClick={() => setPage(page-1)}>Previous</button><span>{page} / {Math.ceil(count/25)}</span><button type="button" disabled={page*25 >= count} onClick={() => setPage(page+1)}>Next</button></div>}
       </Panel>
-      <MobileDetailSurface open={kind === 'maintenance' && Boolean(selected)} onClose={() => setSelected(null)} title="Maintenance Details">
+      <MobileDetailSurface open={Boolean(selected)} onClose={() => setSelected(null)} title={kind === 'maintenance' ? 'Maintenance Details' : 'Submission Details'}>
       <Panel title="Submission Details" description="Select a record to view its details." icon="fileSearch" className="tenant-detail-panel">
         {selected && kind === 'maintenance' ? <MaintenanceSubmissionDetails record={selected} /> : selected ? <dl className="tenant-selected-details">{Object.entries(selected).filter(([key]) => !['id','tenant_id','request_key','invoice_id','room_id'].includes(key)).map(([key,value]) =>
           <div key={key}><dt>{key.replaceAll('_',' ')}</dt><dd>{pretty(value)}</dd></div>)}
