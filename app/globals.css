@@ -8076,3 +8076,11 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
   }
   .app-shell .mobile-nav .nav-link { min-height: 48px; }
 }
+
+/* Every mobile route scrolls inside main-content, so reserve room for the fixed nav. */
+@media (max-width: 999px) {
+  .app-shell .main-content {
+    padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+  }
+  .app-shell .main-content::after { content: none; display: none; }
+}
