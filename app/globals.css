@@ -8032,3 +8032,7 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
 /* Payment summary cards stay compact after all page and mobile overrides. */
 .management-payments .payment-summary__card { min-height: 100px; padding: 13px; }
 .management-payments .payment-summary__card strong { font-size: 25px; }
+
+@media (width < 768px) {
+  .app-shell .content-wrap { padding-inline: 12px !important; }
+}
