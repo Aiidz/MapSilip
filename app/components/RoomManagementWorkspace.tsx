@@ -156,8 +156,7 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
     if (next === undefined) return;
     event.preventDefault();tabs[next].focus();setView(tabs[next].id === 'room-map-tab' ? 'map' : 'tenants');
   }
-  return <div className={`room-management room-management--${view}`}><PageHeader title="Room Management" description="Manage room occupancy, tenant assignments, and room information."
-    action={<button className="dashboard-export room-management__export" type="button" disabled><Icon name="download" />Export Report</button>} />
+  return <div className={`room-management room-management--${view}`}><PageHeader title="Room Management" description="Manage room occupancy, tenant assignments, and room information." />
     <section className="room-summary" aria-label="Room occupancy summary">{summary.map(([title,count,detail],index) => <article
       className={`room-summary__card${index === 0 ? ' room-summary__card--highlight' : ''}`} key={String(title)}>
       <span className="room-summary__title">{title}</span><strong>{loading ? '—' : count}</strong><small>{detail}</small>

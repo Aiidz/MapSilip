@@ -45,6 +45,7 @@
   --motion-ease: cubic-bezier(.22, .61, .36, 1);
 }
 
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --brand-soft: #372727;
@@ -6703,6 +6704,14 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
   .app-shell--tenant:has(.tenant-home) .page-footer { display: none; }
 }
 
+/* Keep payment metrics compact at all breakpoints; later mobile page rules must not enlarge them. */
+.management-payments .payment-summary__card { min-height: 100px; padding: 13px; }
+.management-payments .payment-summary__card strong { font-size: 25px; }
+@media (max-width: 999px) {
+  .app-shell--management .room-management__export,
+  .app-shell--management .maintenance-workspace .page-header__action { display: none !important; }
+}
+
 @media (width < 768px) {
   .tenant-home .tenant-home-summary--welcome { grid-template-columns: minmax(0, 1fr); justify-content: stretch; width: 100%; }
   .tenant-home .tenant-home-summary--welcome .tenant-home-summary__facts { width: 100%; box-sizing: border-box; }
@@ -8019,3 +8028,7 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
     overflow-wrap: anywhere;
   }
 }
+
+/* Payment summary cards stay compact after all page and mobile overrides. */
+.management-payments .payment-summary__card { min-height: 100px; padding: 13px; }
+.management-payments .payment-summary__card strong { font-size: 25px; }
