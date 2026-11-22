@@ -30,6 +30,7 @@ const pretty = (value: unknown) => value == null || value === '' ? '—' : Strin
 const paymentAmount = (amount: unknown, currency: unknown = 'PHP') => Number.isFinite(Number(amount))
   ? new Intl.NumberFormat('en-PH',{ style:'currency',currency:String(currency || 'PHP') }).format(Number(amount)) : '—';
 const paymentMonth = (date: unknown) => date ? new Intl.DateTimeFormat('en-PH',{month:'long',year:'numeric',timeZone:'Asia/Manila'}).format(new Date(String(date))) : '—';
+const periodDate = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const paymentDate = (date: unknown) => date ? new Intl.DateTimeFormat('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:'Asia/Manila'}).format(new Date(String(date))) : '—';
 
 async function operate(action: string, data: Record<string,unknown>) {
@@ -40,26 +41,29 @@ async function operate(action: string, data: Record<string,unknown>) {
 
 
 function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
-  kind: Kind; invoices: Row[]; open: boolean; onClose: () => void; onSaved: () => void;
+  kind: Kind; invoices: Row[]; open: boolean; onClose: () => void; onSaved: (invoiceIds?: string[]) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
 
   // Form field states
-  const [invoiceIdOverride, setInvoiceIdOverride] = useState<string | null>(null);
+  const [invoiceIds, setInvoiceIds] = useState<string[]>([]);
+  const [method, setMethod] = useState('gcash');
+  const [cashRecipient, setCashRecipient] = useState('');
   const [qrReady, setQrReady] = useState(false);
   const [category, setCategory] = useState(kind === 'maintenance' ? 'Furniture & Fixtures' : 'Cleanliness & Sanitation');
 
-  const selectedInvoice = invoiceIdOverride ?? (invoices[0] ? String(invoices[0].id) : '');
-  const activeInvoice = invoices.find((inv) => String(inv.id) === selectedInvoice);
-  const amount = activeInvoice ? String(activeInvoice.amount) : '';
-  const invoiceOptions = invoices.length
-    ? invoices.map((row) => ({
-        value: String(row.id),
-        label: `${String(row.coverage_start)} to ${String(row.coverage_end)} · ${String(row.amount)} ${String(row.currency || 'PHP')}`,
-      }))
-    : [{ value: '', label: 'No pending invoice' }];
+  const sortedInvoices = [...invoices].sort((a, b) => String(a.coverage_start).localeCompare(String(b.coverage_start)));
+  const selectedInvoices = sortedInvoices.filter(row => invoiceIds.includes(String(row.id)));
+  const amountInCentavos = selectedInvoices.reduce((total, row) => total + Math.round(Number(row.amount) * 100), 0);
+
+  const methodOptions = [
+    { value: 'gcash', label: 'GCash' },
+    { value: 'e_wallet', label: 'E-wallet' },
+    { value: 'bank_transfer', label: 'Bank' },
+    { value: 'cash', label: 'Cash' },
+  ];
 
   const maintenanceCategories = [
     { value: 'Furniture & Fixtures', label: 'Furniture & Fixtures' },
@@ -86,11 +90,16 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
     const fields = new FormData(form);
     try {
       if (kind === 'payments') {
+        if (!selectedInvoices.length) throw new Error('Select a payment period.');
         const file = fields.get('file');
-        if (!(file instanceof File) || !file.size) throw new Error('Select a payment proof.');
-        const attachmentId = await uploadAttachment(file,'payment');
-        await operate('payment.submit',{ request_key:requestKey, invoice_id:fields.get('invoice_id'),
-          amount:fields.get('amount'),method:'gcash',reference_number:fields.get('reference_number'),attachment_id:attachmentId });
+        if (method !== 'cash' && (!(file instanceof File) || !file.size)) throw new Error('Select a payment proof.');
+        const attachmentId = method === 'cash' ? null : await uploadAttachment(file as File,'payment');
+        await operate('payment.submit_periods', {
+          request_key: requestKey, invoice_ids: selectedInvoices.map(row => row.id),
+          method, cash_recipient: method === 'cash' ? cashRecipient : null,
+          reference_number: fields.get('reference_number'), attachment_id: attachmentId,
+        });
+        setInvoiceIds([]);
       } else if (kind === 'maintenance') {
         const file = fields.get('file');
         const attachmentId = file instanceof File && file.size ? await uploadAttachment(file,'maintenance') : null;
@@ -101,13 +110,14 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
       }
       setRequestKey(crypto.randomUUID());
       form.reset();
-      onSaved();
+      onSaved(kind === 'payments' ? selectedInvoices.map(row => String(row.id)) : undefined);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'The request could not be saved.'); }
     finally { setBusy(false); }
   }
   return <ResponsiveOverlay
     open={open}
     onClose={close}
+    dismissible={!busy}
     title={kind === 'payments' ? 'Submit payment proof' : kind === 'maintenance' ? 'New maintenance request' : 'New concern or suggestion'}
     variant="dialog"
     className={kind === 'payments' ? 'tenant-submit-payment-overlay' : kind === 'maintenance' ? 'tenant-submit-maintenance-overlay' : 'tenant-submit-concern-overlay'}
@@ -116,19 +126,34 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
       <form onSubmit={submit} className="tenant-modal-form">
         {kind === 'payments' ? (
           <>
+            <fieldset className="tenant-payment-periods" disabled={busy}>
+              <legend>Payment periods</legend>
+              {sortedInvoices.length ? sortedInvoices.map(row => {
+                const id = String(row.id);
+                const checked = invoiceIds.includes(id);
+                return <label key={id} className="tenant-payment-period">
+                  <input type="checkbox" checked={checked} disabled={!checked && selectedInvoices.length >= 12}
+                    onChange={event => {
+                      const add = event.target.checked;
+                      setInvoiceIds(current => add ? [...current, id] : current.filter(value => value !== id));
+                      setRequestKey(crypto.randomUUID());
+                    }} />
+                  <span><strong>{paymentMonth(row.coverage_start)}</strong>
+                    <small>{periodDate.formatRange(new Date(String(row.coverage_start)), new Date(String(row.coverage_end)))}</small>
+                  </span>
+                  <strong>{paymentAmount(row.amount, row.currency)}</strong>
+                </label>;
+              }) : <p>No invoices available.</p>}
+            </fieldset>
+            <div className="tenant-payment-total" aria-live="polite">
+              <span>Total to pay</span><strong>{paymentAmount(amountInCentavos / 100)}</strong>
+            </div>
             <label>
-              <span>Payment period</span>
-              <TenantDropdown
-                name="invoice_id"
-                value={selectedInvoice}
-                onChange={setInvoiceIdOverride}
-                options={invoiceOptions}
-                placeholder="Select invoice"
-                required
-              />
+              <span>Payment method</span>
+              <TenantDropdown name="method" value={method} options={methodOptions} required
+                onChange={value => { if (value !== method) setQrReady(false); setMethod(value); }} />
             </label>
-            <label>Amount (PHP)<input name="amount" value={amount} readOnly /></label>
-            <div>
+            {method === 'gcash' && <div>
               <strong>Pay with GCash</strong>
               {/* Serve the original QR pixels without Next image optimization. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -137,7 +162,16 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
                 onLoad={() => setQrReady(true)} onError={() => setQrReady(false)} />
               {qrReady ? <p>Scan the code or <a href="/api/paymentqr" download="gcash-merchant.png">save it</a>. Confirm the merchant in GCash and pay the full amount before uploading your receipt.</p>
                 : <p>The merchant QR is currently unavailable.</p>}
-            </div>
+            </div>}
+            {method === 'cash' ? <>
+              <label>
+                <span>Cash handed to</span>
+                <TenantDropdown name="cash_recipient" value={cashRecipient} onChange={setCashRecipient}
+                  options={[{ value: 'admin', label: 'Admin' }, { value: 'caretaker', label: 'Caretaker' }]}
+                  placeholder="Select recipient" required />
+              </label>
+              <p>Submit after handing over the cash. Payment stays under review until the admin confirms receipt.</p>
+            </> : <>
             <label>
               <span>Reference number</span>
               <input
@@ -158,7 +192,8 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
                 subtitle="Images optimized automatically · PDF up to 2 MB"
               />
             </label>
-            <button className="button button--primary" type="submit" disabled={busy || !qrReady || activeInvoice?.currency !== 'PHP'}>
+            </>}
+            <button className="button button--primary" type="submit" disabled={busy || !selectedInvoices.length}>
               {busy ? 'Submitting…' : 'Submit for verification'}
             </button>
           </>
@@ -241,6 +276,7 @@ export function TenantWorkspace({ kind, concernId }: { kind: Kind; concernId?: s
   const [count,setCount] = useState(0);
   const [selected,setSelected] = useState<Row | null>(null);
   const [invoices,setInvoices] = useState<Row[]>([]);
+  const [unavailableInvoices,setUnavailableInvoices] = useState<Set<string>>(() => new Set());
   const [summary,setSummary] = useState<Row | null>(null);
   const [loading,setLoading] = useState(true);
   const [concernLinkError, setConcernLinkError] = useState('');
@@ -277,7 +313,13 @@ export function TenantWorkspace({ kind, concernId }: { kind: Kind; concernId?: s
   useEffect(() => {
     const controller = new AbortController();
     if (kind === 'payments') {
-      fetchOperationRows('invoices', controller.signal).then(value => { if (!controller.signal.aborted) setInvoices(value); })
+      Promise.all([fetchOperationRows('invoices', controller.signal), fetchOperationRows('payments', controller.signal)])
+        .then(([invoiceRows, paymentRows]) => {
+          if (controller.signal.aborted) return;
+          setInvoices(invoiceRows);
+          setUnavailableInvoices(new Set(paymentRows.filter(row => row.status === 'approved' || row.status === 'pending')
+            .map(row => String(row.invoice_id))));
+        })
         .catch(() => { if (!controller.signal.aborted) setError('Invoice details could not be loaded. Refresh this page to retry.'); });
     }
     fetch('/api/dashboard', { signal: controller.signal }).then(response => response.ok ? response.json() : null)
@@ -293,10 +335,11 @@ export function TenantWorkspace({ kind, concernId }: { kind: Kind; concernId?: s
     <SubmissionForm
       key={kind}
       kind={kind}
-      invoices={invoices}
+      invoices={invoices.filter(row => !unavailableInvoices.has(String(row.id)) && row.currency === 'PHP')}
       open={showForm}
       onClose={() => setShowForm(false)}
-      onSaved={() => {
+      onSaved={paidInvoiceIds => {
+        if (paidInvoiceIds) setUnavailableInvoices(current => new Set([...current, ...paidInvoiceIds]));
         setShowForm(false);
         void load();
       }}

@@ -177,6 +177,8 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
         <div className="payment-detail-identity"><ProfilePhoto key={String(selected.tenant_id)} className="payment-tenant-avatar" userId={String(selected.tenant_id)} fallback={initials(tenantName(selected.tenant_id))} /><div><strong>{tenantName(selected.tenant_id)}</strong><small>Room {roomName(selected.tenant_id)}</small></div><span className={`payment-status payment-status--${selected.status}`}>{statusLabel(selected.status)}</span></div>
         <h3>Payment Information</h3><dl className="payment-information">
           <div><dt>Amount</dt><dd>{show(selected.amount)} {invoiceCurrency(selected.invoice_id)}</dd></div>
+          {selected.batch_total != null && Number(selected.batch_total) !== Number(selected.amount) &&
+            <div><dt>Total covered by this proof</dt><dd>{show(selected.batch_total)} {invoiceCurrency(selected.invoice_id)}</dd></div>}
           <div><dt>Billing Period</dt><dd>{invoices.find(invoice => invoice.id === selected.invoice_id)?.coverage_start ? new Date(String(invoices.find(invoice => invoice.id === selected.invoice_id)?.coverage_start)).toLocaleDateString(undefined,{ month:'long',year:'numeric' }) : '—'}</dd></div>
           <div><dt>Payment Method</dt><dd>{show(selected.method)}</dd></div>
           <div><dt>Reference Number</dt><dd>{show(selected.reference_number)}</dd></div>
@@ -185,7 +187,9 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
         {selected.attachment_id ? <PaymentProofViewer key={String(selected.attachment_id)} attachmentId={String(selected.attachment_id)} /> : <p className="tenant-payment-proof">{selected.method === 'cash' ? 'Cash payment — verify receipt before approval.' : 'No payment proof attached.'}</p>}
         {selected.status === 'pending' ? <form className="operational-form payment-detail-form" onSubmit={review}>
           {selected.method === 'cash' && <><p>Cash reported as handed to: {show(selected.cash_recipient)}. Confirm only when the admin has received the money.</p><label><input type="checkbox" name="cash_received" /> I confirm the admin received this cash payment.</label></>}
-          {selected.method === 'gcash' && <label><input type="checkbox" name="gcash_received" /> I verified the reference and full invoice amount in the GCash merchant account.</label>}
+          {selected.method === 'gcash' && <label><input type="checkbox" name="gcash_received" /> I verified the reference and total payment amount in the GCash merchant account.</label>}
+          {selected.batch_total != null && Number(selected.batch_total) !== Number(selected.amount) &&
+            <p>Your decision applies to all months covered by this proof.</p>}
           <label>Reason if rejected<textarea name="note" rows={3} maxLength={500} /></label>
           <div className="payment-review-actions"><button className="button payment-review-reject" name="status" value="rejected" disabled={busy}>Reject</button><button className="button payment-review-confirm" name="status" value="approved" disabled={busy}>Confirm Payment</button></div>
         </form> : <div className={`payment-review-result payment-review-result--${selected.status}`}><strong>{selected.status === 'approved' ? '✓ Payment Verified' : 'ⓘ Payment Rejected'}</strong><p>{selected.status === 'approved' ? 'This payment has been confirmed by the admin.' : 'Please contact the admin regarding your payment submission.'}</p>{Boolean(selected.review_note) && <p>{show(selected.review_note)}</p>}</div>}

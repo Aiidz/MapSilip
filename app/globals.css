@@ -8317,3 +8317,11 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
 }
 .metric-breakdown button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .metric-breakdown strong { font-size: 1.25rem; }
+.tenant-payment-periods { min-width: 0; margin: 0; padding: 0; border: 0; }
+.tenant-payment-periods legend { margin-bottom: 8px; color: var(--text); font-weight: 600; }
+.tenant-modal-form .tenant-payment-period { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; margin-bottom: 6px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-control); color: var(--text); cursor: pointer; }
+.tenant-payment-period:has(input:checked) { background: var(--surface-soft); border-color: var(--border-strong); }
+.tenant-payment-period input { width: 18px; height: 18px; margin: 0; }
+.tenant-payment-period span { display: grid; gap: 2px; }
+.tenant-payment-period small { overflow-wrap: anywhere; }
+.tenant-payment-total { display: flex; justify-content: space-between; gap: 12px; padding: 12px; background: var(--surface-soft); border-radius: var(--radius-control); color: var(--text); }
