@@ -32,7 +32,6 @@ const navigation: Record<Area, NavItem[]> = {
     { label: "Maintenance Map", href: "/management/maintenance", icon: "thermometer" },
     { label: "Payment Record", mobileLabel: "Payments", href: "/management/payments", icon: "receipt" },
     { label: "Concerns & Suggestions", mobileLabel: "Concerns", href: "/management/concerns", icon: "sparkles" },
-    { label: "Analytics", href: "/management/analytics", icon: "analytics" },
     { label: "Notifications", href: "/management/notifications", icon: "bell" },
     { label: "Visitors", href: "/management/visitors", icon: "calendar" },
     { label: "More", href: "/management/more", icon: "more" },
@@ -296,13 +295,12 @@ export function AppShell(
           <PortalPageContent pathname={pathname}>{children}</PortalPageContent>
           <footer className="page-footer">
             <span>MapSilip</span>
-            <span>Designed for dorm life, wherever you are.</span>
           </footer>
         </div>
       </main>
 
       <NavLinks area={area} mobile />
-      {authenticatedUserId && <PwaManager key={authenticatedUserId} userId={authenticatedUserId} pushEnabled={pushEnabled} />}
+      {authenticatedUserId && <PwaManager tenant={isTenant} key={authenticatedUserId} userId={authenticatedUserId} pushEnabled={pushEnabled} />}
     </div>
   );
 }

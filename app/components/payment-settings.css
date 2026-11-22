@@ -1,0 +1,38 @@
+.preferences-payment-form {
+  min-width: 0;
+  margin: 0;
+}
+.preferences-payment-form input[type="file"] {
+  min-width: 0;
+  max-width: 100%;
+}
+.preferences-payment-form input::file-selector-button {
+  margin-inline-end: .625rem;
+  padding: .35rem .55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface-soft);
+  font: inherit;
+  cursor: pointer;
+}
+.preferences-payment-form .payment-qr-confirm {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: .625rem;
+  padding-block: .5rem;
+}
+.preferences-payment-form .payment-qr-confirm input {
+  width: 1.125rem;
+  height: 1.125rem;
+  min-height: 0;
+  margin: .125rem 0 0;
+  accent-color: var(--brand-deep);
+}
+.payment-qr-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+}

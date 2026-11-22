@@ -27,17 +27,19 @@ export function Panel({
   description,
   icon,
   children,
+  headerAction,
   className = "",
 }: {
   title: string;
   description?: string;
   icon?: IconName;
   children: ReactNode;
+  headerAction?: ReactNode;
   className?: string;
 }) {
   return (
     <section className={`panel ${className}`}>
-      <div className="panel__header">
+      <div className={headerAction ? "panel__header detail-header" : "panel__header"}>
         <div className="panel__heading">
           {icon
             ? (
@@ -51,6 +53,7 @@ export function Panel({
             {description ? <p>{description}</p> : null}
           </div>
         </div>
+        {headerAction}
       </div>
       {children}
     </section>

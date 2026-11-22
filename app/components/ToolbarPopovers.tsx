@@ -173,10 +173,8 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
       ref={profileMenu}
     >
       <Link role="menuitem" href={profileHref}><Icon name="users" /><span>Profile</span><Icon name="chevron" /></Link>
-      {authEnabled && <button type="button" role="menuitem" onClick={() => {
-        setOpen(null); profileTrigger.current?.focus();
-        window.dispatchEvent(new Event('mapsilip-open-app-settings'));
-      }}><Icon name="bell" /><span>Notification settings</span><Icon name="chevron" /></button>}
+      {authEnabled && <Link role="menuitem" href={`/${area}/settings`} onClick={() => setOpen(null)}>
+        <Icon name="settings" /><span>Settings</span><Icon name="chevron" /></Link>}
       <button
         className={authEnabled ? undefined : "toolbar-profile-menu__disabled"}
         type="button"

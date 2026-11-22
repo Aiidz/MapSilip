@@ -5,6 +5,9 @@ import { CloseIcon } from "./CloseIcon";
 import { MapLoading } from './MapLoading';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
 
+const defaultMapZoom = 1.25;
+const zoomStep = defaultMapZoom / 4;
+
 const mobileQuery = '(max-width: 899px)';
 function subscribeViewport(callback: () => void) {
   const query = window.matchMedia(mobileQuery);
@@ -78,7 +81,7 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const appliedInitialRoomId = useRef<string | null>(null);
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(defaultMapZoom);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const panFrame = useRef<number | null>(null);
   const pendingPan = useRef<{ x: number; y: number } | null>(null);
@@ -108,7 +111,7 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
           setSelectedRoomId(selectedRoom.id);
           setSelectedSlotIndex(null);
           setPan({ x: 0, y: 0 });
-          setZoom(1);
+          setZoom(defaultMapZoom);
         }
       }
       setError('');
@@ -145,7 +148,7 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
 
   const isMobile = useSyncExternalStore(subscribeViewport, mobileSnapshot, serverSnapshot);
   const floorInspection = selectedFloor === '2nd Floor' || selectedFloor === '3rd Floor';
-  const minZoom = isMobile ? (floorInspection ? 1.65 : 1.25) : 1;
+  const minZoom = isMobile && floorInspection ? 1.65 : defaultMapZoom;
   const mapZoom = Math.max(zoom, minZoom);
 
   function chooseFloor(label: string | null) {
@@ -153,7 +156,7 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
     setSelectedRoomId(null);
     setSelectedSlotIndex(null);
     setPan({ x: 0, y: 0 });
-    setZoom(1);
+    setZoom(defaultMapZoom);
   }
   function chooseRoom(room: BuildingRoom) {
     if (selectedFloor !== room.floor_label) {
@@ -164,11 +167,11 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
     setSelectedRoomId(previous => previous === room.id ? null : room.id);
     setSelectedSlotIndex(null);
     setPan({ x: 0, y: 0 });
-    setZoom(1);
+    setZoom(defaultMapZoom);
   }
   function chooseRoomSpace(index: number) {
     setPan({ x: 0, y: 0 });
-    setZoom(1);
+    setZoom(defaultMapZoom);
     setSelectedRoomId(null);
     setSelectedSlotIndex(previous => previous === index ? null : index);
   }
@@ -327,9 +330,9 @@ export function BuildingMapWorkspace({ role, mode = 'rooms', onOpenRoomRecord, o
             roofVisible={true} occupancy={occupancy} onSelectFloor={chooseFloor} onSelectRoom={chooseRoom} onSelectRoomSpace={chooseRoomSpace}
             onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} />
           {!isMobile && <div className="building-experience__zoom" aria-label="Map zoom controls">
-            <button type="button" aria-label="Zoom out" disabled={mapZoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .25))}>−</button>
-            <span aria-live="polite">{Math.round(mapZoom * 100)}%</span>
-            <button type="button" aria-label="Zoom in" disabled={mapZoom >= 4} onClick={() => setZoom(value => Math.min(4, value + .25))}>+</button>
+            <button type="button" aria-label="Zoom out" disabled={mapZoom <= minZoom} onClick={() => setZoom(value => Math.max(minZoom, value - zoomStep))}>−</button>
+            <span aria-live="polite">{Math.round(mapZoom / defaultMapZoom * 100)}%</span>
+            <button type="button" aria-label="Zoom in" disabled={mapZoom >= 4} onClick={() => setZoom(value => Math.min(4, value + zoomStep))}>+</button>
           </div>}
           {selectedFloor && <button className="building-experience__return" type="button" onClick={() => chooseFloor(null)}>← Building view</button>}
         </>}

@@ -18,6 +18,9 @@ const subscribeToPortal = () => () => {};
 const getPortalSnapshot = () => true;
 const getServerPortalSnapshot = () => false;
 
+type OpenOverlay = { handOff: () => { ownsHistory: boolean; closeReplaced: () => void } };
+const openOverlays = new Map<HTMLDialogElement, OpenOverlay>();
+
 type OverlayVariant = 'dialog' | 'drawer';
 
 type ResponsiveOverlayProps = {
@@ -55,6 +58,12 @@ export function ResponsiveOverlay({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const portalReady = useSyncExternalStore(subscribeToPortal, getPortalSnapshot, getServerPortalSnapshot);
   const pushedRef = useRef(false);
+  const closeReplacedRef = useRef<(() => void) | null>(null);
+  const finishReplacement = useCallback(() => {
+    const closeReplaced = closeReplacedRef.current;
+    closeReplacedRef.current = null;
+    closeReplaced?.();
+  }, []);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
   const descriptionId = useId();
@@ -85,8 +94,10 @@ export function ResponsiveOverlay({
     const threshold = Math.min(140, Math.max(80, (dialog?.offsetHeight ?? 400) * .22));
     const dismiss = event.type !== 'pointercancel' && (gesture.distance > threshold || (gesture.distance > 30 && speed > .6));
     dialog?.classList.remove('ps-overlay--dragging');
-    dialog?.classList.add('ps-overlay--drag-return');
-    dialog?.style.setProperty('--sheet-drag-y', '0px');
+    if (!dismiss) {
+      dialog?.classList.add('ps-overlay--drag-return');
+      dialog?.style.setProperty('--sheet-drag-y', '0px');
+    }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (dismiss) requestClose();
   }
@@ -102,7 +113,8 @@ export function ResponsiveOverlay({
       window.history.back();
     }
     onCloseRef.current();
-  }, [dismissible]);
+    finishReplacement();
+  }, [dismissible, finishReplacement]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -112,7 +124,33 @@ export function ResponsiveOverlay({
     dialog.style?.removeProperty('--sheet-drag-y');
 
     if (open && !dialog.open) {
+      const previous = window.matchMedia('(max-width: 767px)').matches
+        ? Array.from(openOverlays.entries()).reverse().find(([node]) => node !== dialog && node.open)?.[1]
+        : undefined;
+      // Close the old dialog visually while keeping its React tree mounted.
+      // A receipt or another nested sheet can be rendered inside that tree.
+      const replaced = previous?.handOff();
       dialog.showModal();
+      openOverlays.set(dialog, {
+        handOff() {
+          const ownsHistory = pushedRef.current;
+          pushedRef.current = false;
+          openOverlays.delete(dialog);
+          dialog.close();
+          return {
+            ownsHistory,
+            closeReplaced() {
+              onCloseRef.current();
+              finishReplacement();
+            },
+          };
+        },
+      });
+      closeReplacedRef.current = replaced?.closeReplaced ?? null;
+      if (replaced?.ownsHistory) {
+        pushedRef.current = true;
+        return;
+      }
       try {
         window.history.pushState(
           { ...(window.history.state ?? {}), mapsilipOverlay: true },
@@ -126,13 +164,15 @@ export function ResponsiveOverlay({
     }
 
     if (!open && dialog.open) {
+      openOverlays.delete(dialog);
       dialog.close();
+      finishReplacement();
       if (pushedRef.current) {
         pushedRef.current = false;
         window.history.back();
       }
     }
-  }, [open, portalReady]);
+  }, [open, portalReady, finishReplacement]);
 
   useEffect(() => {
     function handlePopState() {
@@ -143,11 +183,19 @@ export function ResponsiveOverlay({
       }
       pushedRef.current = false;
       onCloseRef.current();
+      finishReplacement();
     }
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [dismissible]);
+  }, [dismissible, finishReplacement]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    return () => {
+      if (dialog) openOverlays.delete(dialog);
+    };
+  }, [portalReady]);
 
   function handleBackdrop(event: MouseEvent<HTMLDialogElement>) {
     if (event.target === dialogRef.current) requestClose();

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { CalendarDatePicker } from './TenantFormControls';
+import { CalendarDateInput } from './CalendarDateInput';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
 
 export function VisitorFormPreview({
@@ -69,11 +69,11 @@ export function VisitorFormPreview({
 
           <label>
             <span>Visit date</span>
-            <CalendarDatePicker
+            <CalendarDateInput
               name="visit_on"
               value={visitDate}
-              onChange={setVisitDate}
-              minDate={todayStr}
+              onValueChange={setVisitDate}
+              min={todayStr}
               required
             />
           </label>

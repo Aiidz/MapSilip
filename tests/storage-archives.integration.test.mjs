@@ -20,9 +20,9 @@ create table mapsilip_private.accounts(user_id uuid,role text,status text);
 create table public.attachments(id uuid primary key,uploader_id uuid,purpose text,path text,mime_type text,byte_size integer,created_at timestamptz default now(),discarded_at timestamptz);
 create table public.tenant_profiles(user_id uuid primary key,display_name text,status text,created_at timestamptz default now());
 create table public.rooms(id uuid primary key,room_number text,created_at timestamptz default now());
-create table public.room_assignments(id uuid primary key,tenant_id uuid,room_id uuid,contract_attachment_id uuid,ended_on date,created_at timestamptz default now());
+create table public.room_assignments(id uuid primary key,tenant_id uuid,room_id uuid,contract_attachment_id uuid,started_on date,ended_on date,created_at timestamptz default now());
 create table public.invoices(id uuid primary key,tenant_id uuid,room_id uuid,created_at timestamptz default now());
-create table public.payments(id uuid primary key,tenant_id uuid,attachment_id uuid,status text,created_at timestamptz default now());
+create table public.payments(id uuid primary key,tenant_id uuid,invoice_id uuid,attachment_id uuid,status text,created_at timestamptz default now());
 create table public.maintenance_requests(id uuid primary key,tenant_id uuid,room_id uuid,attachment_id uuid,status text,created_at timestamptz default now());
 create table public.concerns(id uuid primary key,tenant_id uuid,created_at timestamptz default now());
 create table public.planned_visits(id uuid primary key,tenant_id uuid,created_at timestamptz default now());
@@ -107,6 +107,21 @@ assert.equal((await db.query('select count(*)::int n from public.payments')).row
 await db.query("update public.payments set status='approved' where id=$1",[payment]);
 await assert.rejects(db.query("update public.payments set status='pending' where id=$1",[payment]));
 for(const actor of ['',tenant,other]) { await db.query("select set_config('app.uid',$1,false),set_config('app.owner','false',false)",[actor]); for(const action of ['inventory','files','archive.create','cleanup.claim','settings','review','remind']) await assert.rejects(command(action,{type:'full',attachment_id:asset,confirmation:asset})); }
+await db.exec(readFileSync(new URL('../supabase/migrations/20261120060800_storage_category_exports.sql',import.meta.url),'utf8'));
+const createCategory = async scope => (await db.query('select public.mapsilip_storage_create_category_archive($1) as result',[scope])).rows[0].result;
+await assert.rejects(createCategory({category:'concerns',type:'full'}));
+await db.query("select set_config('app.uid',$1,false),set_config('app.owner','true',false)",[owner]);
+await db.query("insert into public.concerns(id,tenant_id,created_at) values(gen_random_uuid(),$1,'2026-11-20T16:00:00Z'),(gen_random_uuid(),$2,'2026-11-20T15:59:59Z')",[tenant,other]);
+for (const selection of [{type:'tenant',target_id:tenant},{type:'range',from:'2026-11-21',to:'2026-11-21'}]) {
+  const {id}=await createCategory({category:'concerns',...selection});
+  const {archive,items}=await command('archive.items',{archive_id:id});
+  assert.equal(archive.record_count,1);
+  assert.equal(archive.file_count,0);
+  assert.equal(items[0].record_type,'concerns');
+  assert.equal(items[0].payload.tenant_id,tenant);
+}
+await assert.rejects(createCategory({category:'notifications',type:'full'}));
+await db.query("select set_config('app.uid',$1,false),set_config('app.owner','false',false)",[tenant]);
 console.log('Owner scope, cross-tenant denial, incomplete-archive denial, review gate, deletion metadata, and business-record preservation passed.');
 await db.exec('grant usage on schema auth,mapsilip_private,storage to authenticated; set role authenticated');
 assert.equal((await db.query('select count(*)::int n from public.storage_archives')).rows[0].n,0);

@@ -21,6 +21,13 @@ export async function GET(request: NextRequest) {
       throw new BackendError('unavailable');
     }
     if (!data || typeof data !== 'object') throw new BackendError('unavailable');
+    if (data.viewer_role === 'owner' && data.residents?.length) {
+      const ids = data.residents.map((row: { user_id: string }) => row.user_id);
+      const profiles = await client.from('tenant_profiles').select('user_id,gender').in('user_id', ids);
+      if (profiles.error) throw new BackendError('unavailable');
+      const genders = new Map(profiles.data.map(profile => [profile.user_id, profile.gender]));
+      for (const row of data.residents) row.gender = genders.get(row.user_id) ?? null;
+    }
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const safe = publicBackendError(error);

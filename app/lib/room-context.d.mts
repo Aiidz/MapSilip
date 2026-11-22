@@ -1,5 +1,6 @@
 export type RoomResident = {
   user_id: string;
+  gender?: string | null;
   display_name: string;
   phone: string | null;
   status: string;

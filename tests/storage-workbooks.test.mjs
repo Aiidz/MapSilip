@@ -38,3 +38,21 @@ assert values[2]=='Safetext'
 `], { input: bytes });
   assert.equal(result.status, 0, result.stderr.toString());
 });
+
+test('history report has a dated title block and a filterable financial table', () => {
+  const bytes = buildWorkbook('Payment history', [{ 'Invoice ID': '001', Billed: 2500 }], {
+    columns: ['Invoice ID', 'Billed'], period: 'All history', generated: 'Nov 20, 2026 (Manila)', money: ['Billed'],
+  });
+  const result = spawnSync('python3', ['-c', `
+import sys,io,zipfile,xml.etree.ElementTree as E
+z=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
+ns={'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+sheet=E.fromstring(z.read('xl/worksheets/sheet1.xml'))
+assert sheet.find('m:autoFilter',ns).get('ref') == 'A6:B7'
+assert sheet.find('.//m:pane',ns).get('topLeftCell') == 'A7'
+assert sheet.find('.//m:c[@r="A1"]//m:t',ns).text == 'PAYMENT HISTORY'
+assert sheet.find('.//m:c[@r="B7"]',ns).get('s') == '2'
+assert sheet.find('.//m:c[@r="B7"]/m:v',ns).text == '2500'
+`], { input: bytes });
+  assert.equal(result.status, 0, result.stderr.toString());
+});

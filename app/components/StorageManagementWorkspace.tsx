@@ -1,8 +1,10 @@
 'use client';
 
+import { CalendarDateInput } from './CalendarDateInput';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Panel } from './ui';
-import { ResponsiveOverlay } from './ResponsiveOverlay';
+import Link from 'next/link';
+import { Icon } from './Icon';
+import { PageHeader, Panel } from './ui';
 import { TenantDropdown } from './TenantFormControls';
 
 async function mutate(action: string, data: Record<string, unknown>) { const response = await fetch('/api/storage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, data }) }); const body = await response.json(); if (!response.ok) throw Error(body.message || 'Storage action could not be saved.'); return body; }
@@ -39,8 +41,26 @@ function ArchiveTargetPicker({ kind }: { kind: 'tenant' | 'room' }) {
   </div>;
 }
 
-export function StorageManagementWorkspace({ open, onClose }: { open: boolean; onClose: () => void }) {
+const categories = [
+  { value: 'all', label: 'All histories', icon: 'building' },
+  { value: 'payments', label: 'Payments', icon: 'wallet' },
+  { value: 'rooms', label: 'Rooms', icon: 'map' },
+  { value: 'maintenance', label: 'Maintenance', icon: 'wrench' },
+  { value: 'concerns', label: 'Concerns', icon: 'sparkles' },
+  { value: 'tenants', label: 'Tenants', icon: 'users' },
+] as const;
+
+const scopes = [
+  { value: 'full', label: 'All matching records', icon: 'building' },
+  { value: 'tenant', label: 'Individual tenant', icon: 'users' },
+  { value: 'room', label: 'Individual room', icon: 'wrench' },
+  { value: 'range', label: 'Date range', icon: 'calendar' },
+] as const;
+
+export function StorageManagementWorkspace({ enabled }: { enabled: boolean }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  const [category, setCategory] = useState('all');
+  const [step, setStep] = useState(1);
   const [scopeType, setScopeType] = useState('full');
   const [progress, setProgress] = useState(''), [exportId, setExportId] = useState(''), [completedId, setCompletedId] = useState('');
   const [download, setDownload] = useState<{ url: string; name: string } | null>(null);
@@ -51,19 +71,18 @@ export function StorageManagementWorkspace({ open, onClose }: { open: boolean; o
     setBusy(true); setError(''); setMessage('');
     try { await mutate(type, data); setMessage('Saved.'); return true; } catch (caught) { setError(caught instanceof Error ? caught.message : 'Action failed.'); return false; } finally { setBusy(false); }
   }
-  async function exportArchive(id: string, retry = false) {
+  async function exportArchive(id: string) {
     if (busy) return;
     setBusy(true); setError(''); setCompletedId(''); setExportId(id); setProgress('Preparing archive…');
     const controller = new AbortController(); abort.current = controller;
     try {
-      if (retry) await mutate('archive.retry', { archive_id: id });
       const { downloadArchive } = await import('../lib/storage/export');
       await downloadArchive(id, (blob, name) => new Promise<void>((resolve, reject) => {
         if (controller.signal.aborted) { reject(Error('Export cancelled')); return; }
         if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
         objectUrl.current = URL.createObjectURL(blob); pendingSave.current = { resolve, reject }; setDownload({ url: objectUrl.current, name });
       }), value => setProgress(`${value.processed} of ${value.expected} records and files checked · Part ${value.part}`), controller.signal);
-      setCompletedId(id); setProgress('All expected items were checked and download actions completed. Confirm safe external storage separately.');
+      setCompletedId(id); setProgress('All items verified. Check that your downloads finished.');
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Export failed. Originals were retained.'); }
     finally { setBusy(false); setDownload(null); pendingSave.current = null; abort.current = null; setExportId(''); }
   }
@@ -71,23 +90,86 @@ export function StorageManagementWorkspace({ open, onClose }: { open: boolean; o
     event.preventDefault(); if (busy) return;
     const form = new FormData(event.currentTarget);
     if (['tenant', 'room'].includes(scopeType) && !form.get('target_id')) { setError('Choose a ' + scopeType + ' before exporting.'); return; }
-    const scope = { type: form.get('type'), target_id: form.get('target_id') || null, from: form.get('from') || null, to: form.get('to') || null, ids: String(form.get('ids') || '').split(/[\s,]+/).filter(Boolean) };
-    setBusy(true); setError('');
-    try { const result = await mutate('archive.create', scope); setBusy(false); await exportArchive(result.id); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Archive could not be created.'); setBusy(false); }
+    const scope = { category, type: scopeType, target_id: form.get('target_id') || null, from: form.get('from') || null, to: form.get('to') || null, ids: String(form.get('ids') || '').split(/[\s,]+/).filter(Boolean) };
+    setBusy(true); setError(''); setMessage(''); setProgress(''); setCompletedId('');
+    try { const result = await mutate('archive.create', scope); setBusy(false); setStep(3); await exportArchive(result.id); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Archive could not be created.'); setBusy(false); }
   }
   function savedPart() { const saved = pendingSave.current; pendingSave.current = null; setDownload(null); saved?.resolve(); }
   function cancelExport() { abort.current?.abort(); pendingSave.current?.reject(Error('Export cancelled. Originals were retained.')); pendingSave.current = null; if (exportId) void mutate('archive.failed', { archive_id: exportId }).catch(() => {}); }
-  return <ResponsiveOverlay open={open} onClose={onClose} dismissible={!busy} title="Export Data" description="Keep a copy of your dormitory records and files." className="storage-dialog">
-    <div className="storage-workspace">
-    {error && <p role="alert" className="dashboard-data-error">{error}</p>}
-    {message && <p role="status">{message}</p>}
-      <Panel title="Download a backup" description="Separate Excel files for payments, maintenance and other records, with original photos and documents.">
-        <form className="operational-form" onSubmit={event => void createArchive(event)}><fieldset disabled={busy}><div className="storage-export-choice"><span>What would you like to export?</span><TenantDropdown name="type" value={scopeType} onChange={setScopeType} disabled={busy} placeholder="Choose records to export" options={[{value:'full',label:'All dormitory records'},{value:'tenant',label:'Individual tenant'},{value:'room',label:'Room maintenance history'},{value:'range',label:'Date range'}]} /></div>{(scopeType === 'tenant' || scopeType === 'room') && <ArchiveTargetPicker key={scopeType} kind={scopeType} />}{scopeType === 'range' && <><label>From<input type="date" name="from" required /></label><label>Through<input type="date" name="to" required /></label></>}{scopeType === 'selected' && <label>Selected record IDs (comma separated, up to 100)<textarea name="ids" maxLength={4000} required /></label>}<p className="storage-export-note">Save the ZIP, then open the Excel files inside. Larger backups have several parts — keep them all.</p><details className="storage-help"><summary>About your backup</summary><p>Includes business records and original attachments, never passwords or sessions. ZIP files are not encrypted; keep them on an encrypted device or drive. Each export supports up to 25,000 records and 25,000 files. Use a smaller scope for larger collections.</p></details><button className="button button--primary" disabled={busy}>{busy ? 'Preparing…' : 'Create backup'}</button></fieldset></form>
-        {progress && <p role="status" aria-live="polite">{progress}</p>}
-        {download && <a className="button button--primary" href={download.url} download={download.name} onClick={savedPart}>Download {download.name}</a>}
-        {exportId && <button className="button button--secondary" onClick={cancelExport}>Cancel export</button>}
-        {completedId && <button className="button button--secondary" disabled={busy} onClick={() => { if (window.confirm('Have every ZIP part and the export report finished downloading, and have you safely stored them on your encrypted owner-controlled device or drive? This confirmation does not authorize deletion.')) void action('archive.confirm', { archive_id: completedId, confirmation: 'DOWNLOADED AND SAFELY STORED' }).then(saved => { if (saved) setCompletedId(''); }); }}>Confirm downloaded archive is safely stored</button>}
-      </Panel>
+  const steps = ['Choose records', 'Choose scope', 'Download files'];
+  const isReport = download?.name.endsWith('export-report.zip');
+  const isIncomplete = download?.name.endsWith('-INCOMPLETE.json');
 
-  </div></ResponsiveOverlay>;
+  return <div className="storage-workspace export-page">
+    <Link className="export-back" href="/management">← Back to dashboard</Link>
+    <PageHeader title="Export data" />
+    <ol className="export-steps" aria-label="Export progress">
+      {steps.map((title, index) => <li key={title} aria-current={step === index + 1 ? 'step' : undefined}>
+        <span>{index + 1}</span>{title}
+      </li>)}
+    </ol>
+
+    {!enabled ? <Panel title="Export unavailable">
+      <p>Storage exports need to be enabled for this workspace.</p>
+    </Panel> : <Panel title={steps[step - 1]}>
+      {error && <p role="alert" className="dashboard-data-error">{error}</p>}
+      {message && <p role="status">{message}</p>}
+      {step === 1 ? <form className="export-form" onSubmit={event => {
+        event.preventDefault(); setError(''); setStep(2);
+      }}>
+        <fieldset>
+          <legend>Record category</legend>
+          <div className="export-options">
+            {categories.map(option => <label key={option.value} className="export-option">
+              <input type="radio" name="category" value={option.value} checked={category === option.value}
+                onChange={() => setCategory(option.value)} />
+              <Icon name={option.icon} /><span>{option.label}</span>
+            </label>)}
+          </div>
+          <div className="export-actions"><button className="button button--primary">Continue</button></div>
+        </fieldset>
+      </form> : step === 2 ? <form className="export-form" onSubmit={event => void createArchive(event)}>
+        <fieldset disabled={busy}>
+          <legend>{categories.find(option => option.value === category)?.label}</legend>
+          <div className="export-options">
+            {scopes.map(scope => <label key={scope.value} className="export-option">
+              <input type="radio" name="type" value={scope.value} checked={scopeType === scope.value}
+                onChange={() => setScopeType(scope.value)} />
+              <Icon name={scope.icon} />
+              <span>{scope.label}</span>
+            </label>)}
+          </div>
+          {(scopeType === 'tenant' || scopeType === 'room') && <ArchiveTargetPicker key={scopeType} kind={scopeType} />}
+          {scopeType === 'range' && <div className="export-dates">
+            <label>From<CalendarDateInput name="from" required /></label>
+            <label>Through<CalendarDateInput name="to" required /></label>
+          </div>}
+          <div className="export-note"><Icon name="info" /><p>Exports include Excel files and original attachments. Keep every ZIP part and the export report together on encrypted storage.</p></div>
+          <div className="export-actions">
+            <button type="button" className="button button--secondary" onClick={() => { setError(''); setStep(1); }}>Back</button>
+            <button className="button button--primary">{busy ? 'Preparing…' : 'Prepare export'}</button></div>
+        </fieldset>
+      </form> : <>
+        {progress && <p role="status">{progress}</p>}
+        {download && <div className="export-note">
+          <Icon name="download" /><p>{download.name}</p>
+        </div>}
+        <div className="export-actions">
+          {download && <a className="button button--primary" href={download.url} download={download.name} onClick={savedPart}>
+            {isIncomplete ? 'Download error report' : isReport ? 'Download export report' : 'Download ZIP part'}
+          </a>}
+          {exportId && <button type="button" className="button button--secondary" onClick={cancelExport}>Cancel export</button>}
+          {completedId && <button type="button" className="button button--primary" disabled={busy} onClick={() => {
+            if (window.confirm('Have all ZIP parts and the export report finished downloading, and are they saved on encrypted storage you control?')) {
+              void action('archive.confirm', { archive_id: completedId, confirmation: 'DOWNLOADED AND SAFELY STORED' })
+                .then(saved => { if (saved) setCompletedId(''); });
+            }
+          }}>Confirm safe storage</button>}
+          {!busy && <button type="button" className="button button--secondary" onClick={() => {
+            setProgress(''); setError(''); setMessage(''); setCompletedId(''); setStep(1);
+          }}>New export</button>}
+        </div>
+      </>}
+    </Panel>}
+  </div>;
 }

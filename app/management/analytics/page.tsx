@@ -1,3 +1,3 @@
-import { AnalyticsWorkspace } from '../../components/AnalyticsWorkspace';
+import { redirect } from 'next/navigation';
 
-export default function AnalyticsPage() { return <AnalyticsWorkspace />; }
+export default function AnalyticsPage() { redirect('/management'); }

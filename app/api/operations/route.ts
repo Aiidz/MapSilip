@@ -12,7 +12,7 @@ type ResourceSpec = { table: string; columns: string; order: string; search: str
 const resources: Record<string, ResourceSpec> = {
   rooms: { table: 'rooms', columns: 'id,room_number,floor_label,capacity,availability,monthly_rent,gender_policy,created_at', order: 'room_number', search: 'room_number', statuses: ['available','reserved','maintenance'] },
   assignments: { table: 'room_assignments', columns: 'id,tenant_id,room_id,started_on,ended_on,contract_attachment_id,contract_end_on,contract_monthly_rent,created_at', order: 'created_at', search: '', statuses: [] },
-  tenants: { table: 'tenant_profiles', columns: 'user_id,display_name,phone,emergency_contact,status,created_at', order: 'created_at', search: 'display_name', statuses: ['active','inactive'] },
+  tenants: { table: 'tenant_profiles', columns: 'gender,user_id,display_name,phone,emergency_contact,status,created_at', order: 'created_at', search: 'display_name', statuses: ['active','inactive'] },
   accountRequests: { table: 'account_requests', columns: 'id,email,display_name,phone,gender,preferred_room_id,status,created_at,reviewed_at', order: 'created_at', search: 'email', statuses: ['pending','approved','rejected','activated'] },
   invoices: { table: 'invoices', columns: 'id,tenant_id,room_id,coverage_start,coverage_end,due_on,amount,currency,note,created_at', order: 'created_at', search: '', statuses: [] },
   payments: { table: 'payments', columns: 'id,invoice_id,tenant_id,amount,method,cash_recipient,reference_number,attachment_id,status,review_note,created_at,reviewed_at', order: 'created_at', search: 'reference_number', statuses: ['pending','approved','rejected'] },
@@ -105,7 +105,8 @@ export async function GET(request: NextRequest) {
     if (read && (kind !== 'notifications' || !['unread','read'].includes(read))) throw new BackendError('invalid_input');
     const client = await createSupabaseServerClient();
     await verifyAuthSession(client.auth);
-    let query = client.from(spec.table).select(spec.columns, { count: 'exact' });
+    const columns = kind === 'maintenance' ? `${spec.columns},satisfaction_rating,satisfaction_comment` : spec.columns;
+    let query = client.from(spec.table).select(columns, { count: 'exact' });
     if (recordId) query = query.eq('id', recordId);
     if (tenantId) query = query.eq('tenant_id', tenantId);
     if (search && kind === 'payments') {
@@ -130,8 +131,14 @@ export async function GET(request: NextRequest) {
       const end = new Date(Date.UTC(year,index,1)).toISOString();
       query = query.gte('created_at',start).lt('created_at',end);
     }
-    const { data, count, error } = await query.order(spec.order, { ascending: kind === 'rooms' })
-      .range((page - 1) * pageSize, page * pageSize - 1);
+    query = query.order(spec.order, { ascending: kind === 'rooms' });
+    if (kind === 'payments') query = query.order('id');
+    const paginated = query.range((page - 1) * pageSize, page * pageSize - 1);
+    let result = await paginated;
+    if (kind === 'maintenance' && result.error?.code === '42703' && /satisfaction_(rating|comment)/.test(result.error.message)) {
+      result = await paginated.select(spec.columns);
+    }
+    const { data, count, error } = result;
     if (error) throw new BackendError('unavailable');
     let rows: unknown[] = (data ?? []) as unknown as Record<string, unknown>[];
     if (kind === 'notifications' && rows.length) {
@@ -147,7 +154,7 @@ export async function GET(request: NextRequest) {
 
 const allowedActions = new Set([
   'notification.read','notification.unread','profile.update','attachment.begin','room.create','room.update','room.assign',
-  'invoice.create','payment.submit','payment.review','maintenance.create','maintenance.update',
+  'invoice.create','payment.submit','payment.review','maintenance.create','maintenance.update','maintenance.rate',
   'concern.create','concern.respond','visit.create','visit.cancel',
 ]);
 
@@ -162,6 +169,8 @@ export async function POST(request: NextRequest) {
     await verifyAuthSession(client.auth);
     const { data, error } = body.action === 'notification.unread'
       ? await client.rpc('mapsilip_mark_notification_unread', { p_id: body.data.id })
+      : body.action === 'maintenance.rate'
+      ? await client.rpc('mapsilip_rate_maintenance', { p_id: body.data.id, p_rating: body.data.rating, p_comment: body.data.comment })
       : body.action === 'visit.create'
       ? await client.rpc('mapsilip_create_visit', { p_data: body.data })
       : body.action === 'concern.create'

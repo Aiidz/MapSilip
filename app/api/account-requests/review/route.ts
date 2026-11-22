@@ -32,7 +32,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (contract_attachment_id != null && (typeof contract_attachment_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(contract_attachment_id))) throw new BackendError('invalid_input');
-    if (contract_end_on != null && (typeof contract_end_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(contract_end_on))) throw new BackendError('invalid_input');
+    if (decision === 'approved') {
+      const endDate = typeof contract_end_on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(contract_end_on)
+        ? new Date(contract_end_on + 'T00:00:00Z') : null;
+      if (!endDate || !Number.isFinite(endDate.getTime()) || endDate.toISOString().slice(0, 10) !== contract_end_on ||
+          (started_on && contract_end_on < started_on)) throw new BackendError('invalid_input');
+    }
     if (decision === 'rejected' && (typeof note !== 'string' || !note.trim())) throw new BackendError('invalid_input');
     const client = await createSupabaseServerClient();
     const { error, data } = await client.rpc('mapsilip_review_account_contract', {
@@ -42,7 +47,7 @@ export async function POST(request: NextRequest) {
       p_started_on: decision === 'approved' ? (started_on || null) : null,
       p_note: typeof note === 'string' ? note.trim() : null,
       p_contract_id: contract_attachment_id ?? null,
-      p_contract_end_on: contract_end_on ?? null,
+      p_contract_end_on: decision === 'approved' ? contract_end_on : null,
     });
 
     if (error || data?.state !== decision) {

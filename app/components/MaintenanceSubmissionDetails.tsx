@@ -11,7 +11,7 @@ const dateLabel = (value: unknown) => {
   }).format(date);
 };
 
-function RequestAttachment({ id }: { id: string }) {
+export function RequestAttachment({ id }: { id: string }) {
   const [preview, setPreview] = useState('');
   const [state, setState] = useState('loading');
   const href = '/api/attachments?id=' + encodeURIComponent(id);
@@ -40,7 +40,45 @@ function RequestAttachment({ id }: { id: string }) {
   </div>;
 }
 
-export function MaintenanceSubmissionDetails({ record }: { record: Row }) {
+function MaintenanceFeedback({ record, onRate }: { record: Row; onRate: (rating: number, comment: string) => Promise<void> }) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  if (record.satisfaction_rating) return <section className="maintenance-feedback">
+    <h3>Your feedback</h3>
+    <p className="maintenance-feedback__result">{String(record.satisfaction_rating)} out of 5 stars</p>
+    {Boolean(record.satisfaction_comment) && <p>{String(record.satisfaction_comment)}</p>}
+  </section>;
+
+  return <form className="maintenance-feedback" onSubmit={async event => {
+    event.preventDefault();
+    if (!rating || busy) return;
+    setBusy(true);
+    setError(false);
+    try { await onRate(rating, comment.trim()); }
+    catch { setError(true); }
+    finally { setBusy(false); }
+  }}>
+    <fieldset disabled={busy}>
+      <legend>How satisfied were you with the repair?</legend>
+      <div className="maintenance-feedback__stars">
+        {[1, 2, 3, 4, 5].map(value => <label key={value} data-filled={value <= rating}>
+          <input className="sr-only" type="radio" name="satisfaction" value={value} checked={rating === value}
+            onChange={() => setRating(value)} aria-label={value === 1 ? '1 star' : `${value} stars`} />
+          <span aria-hidden="true">{value <= rating ? '★' : '☆'}</span>
+        </label>)}
+      </div>
+      <label className="maintenance-feedback__comment">Comment <span>(optional)</span>
+        <textarea rows={3} maxLength={1000} value={comment} onChange={event => setComment(event.target.value)} />
+      </label>
+    </fieldset>
+    {error && <p role="alert">Couldn’t submit feedback. Reopen this request to check whether it was saved.</p>}
+    <button className="button button--primary" disabled={!rating || busy}>{busy ? 'Submitting…' : 'Submit feedback'}</button>
+  </form>;
+}
+
+export function MaintenanceSubmissionDetails({ record, onRate }: { record: Row; onRate: (rating: number, comment: string) => Promise<void> }) {
   const status = String(record.status ?? 'pending');
   const statusLabel = status.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
   return <div className="maintenance-request-detail">
@@ -49,6 +87,7 @@ export function MaintenanceSubmissionDetails({ record }: { record: Row }) {
       <div><span className="maintenance-request-detail__eyebrow">Repair category</span><h3>{String(record.category ?? 'Maintenance request')}</h3></div>
       <span className={'maintenance-request-detail__status maintenance-request-detail__status--' + status}>{statusLabel}</span>
     </div>
+    {status === 'resolved' && 'satisfaction_rating' in record && <MaintenanceFeedback record={record} onRate={onRate} />}
     <dl className="maintenance-request-detail__dates">
       <div><dt>Reported</dt><dd>{dateLabel(record.created_at)}</dd></div>
       <div><dt>Last updated</dt><dd>{dateLabel(record.updated_at)}</dd></div>

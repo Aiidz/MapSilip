@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation';
-import { requireStaffAccess } from '../../lib/backend/server';
+import { StorageManagementWorkspace } from '../../components/StorageManagementWorkspace';
+import { requireStaffPortalAccess } from '../../lib/backend/server';
+import { storageEnabled } from '../../lib/storage/server';
 
-// Preserve existing notification links without retaining a separate workspace.
 export default async function StorageManagementPage() {
-  await requireStaffAccess('finance.read');
-  redirect('/management?export=1');
+  await requireStaffPortalAccess('owner');
+  return <StorageManagementWorkspace enabled={storageEnabled()} />;
 }

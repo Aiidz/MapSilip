@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { canInviteInstall, dismissInstall, readDismissal } from '../lib/pwa/install';
 import { getInstallPrompt, takeInstallPrompt, type InstallPromptEvent } from '../lib/pwa/install-prompt';
 import { readDecision, saveDecision, setupStage } from '../lib/pwa/onboarding';
-import { foregroundNotificationReceivedEvent, isMobileNotificationDevice } from '../lib/pwa/foreground';
+import { isMobileNotificationDevice } from '../lib/pwa/foreground';
 
 const subscribeToDevice = () => () => {};
 const deviceSnapshot = () => isMobileNotificationDevice(navigator);
@@ -15,10 +15,10 @@ const ForegroundFeed = dynamic(() => import('./ForegroundNotifications').then(mo
 const Onboarding = dynamic(() => import('./PwaOnboarding').then(module => module.PwaOnboarding));
 
 /** Mounted once in the authenticated shell; installation never depends on push. */
-export function PwaManager({ userId, pushEnabled = false }: { userId: string; pushEnabled?: boolean }) {
+export function PwaManager({ userId, tenant, pushEnabled = false }: { userId: string; tenant: boolean; pushEnabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const mobile = useSyncExternalStore<boolean | null>(subscribeToDevice, deviceSnapshot, serverDeviceSnapshot);
-  const [mode, setMode] = useState<'profile' | 'invite' | 'settings' | 'notifications'>('settings');
+  const [mode, setMode] = useState<'contact' | 'profile' | 'invite' | 'settings' | 'notifications'>('settings');
   const manualOpen = useRef(false);
   const [hasOpened, setHasOpened] = useState(false);
   const [ios, setIos] = useState(false);
@@ -33,7 +33,7 @@ export function PwaManager({ userId, pushEnabled = false }: { userId: string; pu
   const advanceSetup = useRef<() => void>(() => {});
   const [installing, setInstalling] = useState(false);
   const installPending = useRef(false);
-  const currentStage = useRef<'profile' | 'invite' | 'settings' | 'notifications'>('settings');
+  const currentStage = useRef<'contact' | 'profile' | 'invite' | 'settings' | 'notifications'>('settings');
 
   const openSettings = useCallback(() => {
     manualOpen.current = true; currentStage.current = 'settings'; setMode('settings'); setHasOpened(true); setOpen(true);
@@ -69,7 +69,7 @@ export function PwaManager({ userId, pushEnabled = false }: { userId: string; pu
       installEligible.current = (eligible && isIos) || (!installed && until <= Date.now() && Boolean(deferred.current))
         || (!installed && currentStage.current === 'invite' && !readDecision(`install:${userId}`));
       if (manualOpen.current || dismissed.current || !photoChecked) return;
-      const stage = setupStage({ photoDone: photoUnavailable || Boolean(readDecision(`profile:${userId}`)), notificationDone: Boolean(readDecision(notificationScope.current)),
+      const stage = setupStage({ contactNeeded: tenant && !readDecision(`contact:${userId}`), photoDone: photoUnavailable || Boolean(readDecision(`profile:${userId}`)), notificationDone: Boolean(readDecision(notificationScope.current)),
         installDone: Boolean(readDecision(`install:${userId}`)),
         standalone: installed, installEligible: installEligible.current });
       if (!stage) { dismissed.current = true; setOpen(false); }
@@ -102,7 +102,6 @@ export function PwaManager({ userId, pushEnabled = false }: { userId: string; pu
       if (!manualOpen.current && currentStage.current === 'invite') updateEligibility();
     }
     window.addEventListener('mapsilip-open-app-settings', openSettings);
-    window.addEventListener(foregroundNotificationReceivedEvent, openSettings);
     function visible() { if (document.visibilityState === 'visible') updateEligibility(); }
     window.addEventListener('beforeinstallprompt', beforeInstall);
     window.addEventListener('appinstalled', installed);
@@ -129,19 +128,19 @@ export function PwaManager({ userId, pushEnabled = false }: { userId: string; pu
     return () => {
       active = false; photoRequest.abort(); advanceSetup.current = () => {}; unregisterUpdate?.();
       window.removeEventListener('mapsilip-open-app-settings', openSettings);
-      window.removeEventListener(foregroundNotificationReceivedEvent, openSettings);
       window.removeEventListener('beforeinstallprompt', beforeInstall);
       window.removeEventListener('appinstalled', installed);
       document.removeEventListener('visibilitychange', visible);
       compact.removeEventListener('change', updateEligibility);
       display.removeEventListener('change', updateEligibility);
     };
-  }, [userId, openSettings]);
+  }, [userId, tenant, openSettings]);
 
   function close() {
     dismissed.current = true;
     // Closing setup defers the remaining steps; per-step Not now only defers that step.
     if (mode !== 'settings') {
+      if (tenant && !readDecision(`contact:${userId}`)) saveDecision(`contact:${userId}`, 'later');
       if (!readDecision(`profile:${userId}`)) saveDecision(`profile:${userId}`, 'later');
       if (!readDecision(`install:${userId}`)) saveDecision(`install:${userId}`, 'later');
       if (!readDecision(notificationScope.current)) saveDecision(notificationScope.current, 'later');
@@ -152,7 +151,7 @@ export function PwaManager({ userId, pushEnabled = false }: { userId: string; pu
   function continueSetup(decision: 'enabled' | 'later') {
     const stage = currentStage.current;
     if (stage === 'settings') return;
-    const scope = stage === 'profile' ? `profile:${userId}` : stage === 'invite' ? `install:${userId}` : notificationScope.current;
+    const scope = stage === 'contact' ? `contact:${userId}` : stage === 'profile' ? `profile:${userId}` : stage === 'invite' ? `install:${userId}` : notificationScope.current;
     saveDecision(scope, decision);
     if (stage === 'invite' && decision === 'later') {
       try { dismissInstall(window.localStorage, userId, Date.now()); } catch { /* Session decision remains available. */ }

@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarDateInput } from './CalendarDateInput';
 import { uploadAttachment } from '../lib/uploads/client';
 import { CloseIcon } from "./CloseIcon";
 
@@ -54,6 +55,7 @@ function Field({ name, label, type = 'text', required = true, options, value }: 
     {options ? <select name={name} required={required} defaultValue={value ?? ''}>
       <option value="" disabled>Choose {label.toLowerCase()}</option>{options.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
     </select> : type === 'textarea' ? <textarea name={name} required={required} defaultValue={value} rows={3} maxLength={2000} />
+      : type === 'date' ? <CalendarDateInput name={name} required={required} defaultValue={value} />
       : <input name={name} type={type} required={required} defaultValue={value} maxLength={type === 'text' ? 500 : undefined}
           step={type === 'number' ? name === 'capacity' ? '1' : '0.01' : undefined}
           min={type === 'number' ? name === 'capacity' ? '1' : '0.01' : undefined} />}
@@ -260,7 +262,6 @@ export function OperationalWorkspace({ title, description, resources, role, init
         dismissible={!busy}
         onClose={() => { if (!busy) { setFormAction(''); setMessage(''); requestKey.current = null; } }}
         title={formTitles[renderedAction] ?? 'Edit record'}
-        description="Complete the details below. Your changes are saved when you submit."
         variant={['account.review', 'room.assign', 'invoice.create'].includes(renderedAction) ? 'drawer' : 'dialog'}
       >
       {renderedAction && <form key={`${renderedAction}-${String(editing?.id ?? '')}`} className="operational-form" onSubmit={submit}>

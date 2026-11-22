@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
 import { Icon } from './Icon';
 
-function ReceiptLoading() {
-  return <span className="receipt-loading" role="status" aria-label="Loading receipt">
+function ReceiptLoading({ label }: { label: string }) {
+  return <span className="receipt-loading" role="status" aria-label={`Loading ${label}`}>
     <span aria-hidden="true"><Icon name="receipt" /></span>
   </span>;
 }
 
-export function PaymentProofViewer({ attachmentId }: { attachmentId: string }) {
+export function PaymentProofViewer({ attachmentId, kind = 'receipt' }: { attachmentId: string; kind?: 'receipt' | 'contract' }) {
+  const label = kind === 'contract' ? 'rental contract' : 'uploaded receipt';
+  const title = kind === 'contract' ? 'Rental contract' : 'Payment receipt';
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<{ url: string; image: boolean } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -28,19 +30,24 @@ export function PaymentProofViewer({ attachmentId }: { attachmentId: string }) {
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
   }, [attachmentId]);
   return <>
-    <button type="button" className="payment-receipt-preview" onClick={() => setOpen(true)} aria-label="View uploaded receipt">
+    <button type="button" className="payment-receipt-preview" onClick={() => setOpen(true)} aria-label={`View ${label}`}>
       {file?.image && (
         // Authorized private response is displayed through a temporary object URL.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={file.url} alt="" />
       )}
-      {!file && !failed ? <ReceiptLoading /> : <span><Icon name="receipt" />{failed ? 'Receipt preview unavailable' : 'View uploaded receipt'}</span>}
+      {!file && !failed ? <ReceiptLoading label={label} /> : <span><Icon name="receipt" />{failed ? 'Preview unavailable' : `View ${label}`}</span>}
     </button>
-    <ResponsiveOverlay open={open} onClose={() => setOpen(false)} title="Payment receipt" className="payment-receipt-viewer">
+    <ResponsiveOverlay open={open} onClose={() => setOpen(false)} title={title} className="payment-receipt-viewer">
       {file ? file.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={file.url} alt="Uploaded payment receipt" />
-      ) : <iframe src={file.url + '#toolbar=0'} title="Uploaded payment receipt" /> : failed ? <p role="alert">The receipt could not be loaded. Close this viewer and try again later.</p> : <ReceiptLoading />}
+        <img src={file.url} alt={title} />
+      ) : <iframe src={file.url + '#toolbar=0'} title={title} /> : failed ? <p role="alert">The {label} could not be loaded. Close this viewer and try again later.</p> : <ReceiptLoading label={label} />}
+      {kind === 'contract' && file && (
+        <a className="button button--secondary" href={`/api/attachments?id=${encodeURIComponent(attachmentId)}`}>
+          Download rental contract
+        </a>
+      )}
     </ResponsiveOverlay>
   </>;
 }

@@ -13,6 +13,14 @@ import { PageHeader } from './ui';
 
 type Notice = { id:string;title:string;body:string;href:string;event_key:string;read_at:string|null;created_at:string;actor_id?:string|null;actor_name?:string|null };
 type Area = 'management' | 'caretaker' | 'tenant';
+
+function notificationDestination(notice: Notice, area: Area) {
+  const concern = /^concern:([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}):/i.exec(notice.event_key);
+  return concern && (area === 'tenant' || area === 'management')
+    ? `/${area}/concerns?recordId=${encodeURIComponent(concern[1])}`
+    : notice.href;
+}
+
 type NoticeCategory = '' | 'payments' | 'maintenance' | 'concerns' | 'accounts' | 'visits';
 
 const noticeCategories: { id: NoticeCategory; label: string }[] = [
@@ -152,7 +160,7 @@ export function NotificationWorkspace({ area }: { area: Area }) {
   }
   const selected = rows.find(row => row.id === selectedId) ?? null;
   const groups = groupNoticesByDay(rows);
-  return <div className={`notifications-workspace${selected ? ' has-selection' : ''}`}><PageHeader title="Notifications" action={<button type="button" className="button button--secondary" onClick={() => window.dispatchEvent(new Event('mapsilip-open-app-settings'))}><Icon name="bell" />Settings</button>} />
+  return <div className={`notifications-workspace${selected ? ' has-selection' : ''}`}><PageHeader title="Notifications" action={<Link className="button button--secondary" href={`/${area}/settings?section=notifications`}><Icon name="settings" />Settings</Link>} />
     <label className="notifications-search"><Icon name="search" /><span className="sr-only">Search notifications</span>
       <input type="search" placeholder="Search notifications..." value={query} onChange={event => { setQuery(event.target.value);setPage(1);setSelectedId(''); }} /></label>
     <div className="notifications-filters" role="group" aria-label="Filter notifications">
@@ -177,15 +185,17 @@ export function NotificationWorkspace({ area }: { area: Area }) {
       {selected && <aside id="notification-detail" className="notifications-detail" aria-label="Notification details">
         <div key={selected.id} className="notifications-detail__content">
           <button type="button" className="notifications-detail__back" onClick={() => { setSelectedId(''); requestAnimationFrame(() => lastSelectedButton.current?.focus()); }}>← Back</button>
-          <NoticeAvatar version={photoVersion} name={selected.actor_name} userId={selected.actor_id} className="notifications-detail__icon" fallback={noticeIcon(selected)} />
-          {selected.actor_name && <strong className="notifications-detail__actor">{selected.actor_name}</strong>}
-          <span className={`notifications-detail__status${selected.read_at ? '' : ' is-unread'}`}>{selected.read_at ? 'Read' : 'Unread'}</span>
+          <div className="notifications-detail__sender">
+            <NoticeAvatar version={photoVersion} name={selected.actor_name} userId={selected.actor_id} className="notifications-detail__icon" fallback={noticeIcon(selected)} />
+            {selected.actor_name && <strong className="notifications-detail__actor">{selected.actor_name}</strong>}
+            <span className={`notifications-detail__status${selected.read_at ? '' : ' is-unread'}`}>{selected.read_at ? 'Read' : 'Unread'}</span>
+          </div>
           <h2 ref={detailHeading} tabIndex={-1}>{selected.title}</h2><p>{selected.body}</p>
           <time dateTime={selected.created_at}>{new Date(selected.created_at).toLocaleString()}</time>
           <NotificationRecordDetail eventKey={selected.event_key} />
           <div className="notifications-detail__actions">
             {selected.read_at && <button type="button" className="button button--secondary" onClick={() => void markUnread(selected.id)}>Mark as unread</button>}
-            <Link className="button button--primary" href={selected.href} aria-busy={openingNotificationId === selected.id} onClick={async event => {
+            <Link className="button button--primary" href={notificationDestination(selected, area)} aria-busy={openingNotificationId === selected.id} onClick={async event => {
               if (openingNotificationId) { event.preventDefault(); return; }
               if (area !== 'tenant' && selected.event_key.startsWith('maintenance:')) {
                 event.preventDefault();
@@ -194,7 +204,8 @@ export function NotificationWorkspace({ area }: { area: Area }) {
               }
               if (selected.read_at) return;
               event.preventDefault();
-              if (await markRead(selected.id)) router.push(selected.href);
+              await markRead(selected.id);
+              router.push(notificationDestination(selected, area));
             }}>{openingNotificationId === selected.id ? 'Opening…' : 'Open full page'} <Icon name="arrow" /></Link>
           </div>
         </div>

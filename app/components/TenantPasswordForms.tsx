@@ -24,7 +24,7 @@ export function TenantRecoveryForm({ onSentChange }: { onSentChange?: (sent: boo
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || retryIn > 0) return;
+    if (sent || busy || retryIn > 0) return;
     setBusy(true);
     setMessage("");
     try {
@@ -65,9 +65,9 @@ export function TenantRecoveryForm({ onSentChange }: { onSentChange?: (sent: boo
         autoCorrect="off" value={email} onChange={event => { setEmail(event.target.value); setMessage(''); }} required maxLength={320} aria-invalid={message.startsWith('No account')} aria-describedby={message ? 'recovery-message' : undefined} />
     </label>}
     {message && <p id="recovery-message" className="auth-form-message" role="alert">{message}</p>}
-    <button className="auth-submit" type="submit" disabled={busy || retryIn > 0} aria-busy={busy}>
-      {busy ? "Sending…" : retryIn > 0 ? `Send again in ${retryIn}s` : sent ? "Resend Reset Link" : "Send Reset Link"}
-    </button>
+    {!sent && <button className="auth-submit" type="submit" disabled={busy || retryIn > 0} aria-busy={busy}>
+      {busy ? "Sending…" : retryIn > 0 ? `Try again in ${retryIn}s` : "Send Reset Link"}
+    </button>}
     {sent && <button className="auth-recovery-change-email" type="button" disabled={busy} onClick={() => { setSent(false); setMessage(''); onSentChange?.(false); }}>Use a different email</button>}
     <p className="auth-switch"><Link href="/login">Return to Log In</Link></p>
   </form>;

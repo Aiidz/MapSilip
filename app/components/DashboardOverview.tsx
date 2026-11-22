@@ -1,5 +1,6 @@
 'use client';
 
+import { AnalyticsWorkspace } from './AnalyticsWorkspace';
 import { DataSkeleton } from './DataSkeleton';
 
 import Link from 'next/link';
@@ -9,7 +10,6 @@ import { Icon } from './Icon';
 import { EmptyState, PageHeader } from './ui';
 import { formatTenantMonthlyRent } from '../lib/tenant-dashboard.mjs';
 import dynamic from 'next/dynamic';
-const StorageManagementWorkspace = dynamic(() => import('./StorageManagementWorkspace').then(module => module.StorageManagementWorkspace), { loading: () => <p role="status">Opening export…</p> });
 const AccountRequestsDialog = dynamic(() => import('./AccountRequestsDialog').then(module => module.AccountRequestsDialog));
 
 type Row = Record<string, unknown>;
@@ -17,36 +17,36 @@ type Summary = Record<string, unknown>;
 type Role = 'owner' | 'caretaker' | 'tenant';
 const number = (value: unknown) => Number(value || 0);
 const text = (value: unknown) => typeof value === 'string' ? value : '—';
-const statuses = (value: unknown) => value && typeof value === 'object' ? value as Record<string,number> : {};
 
-export function DashboardOverview({ role, showAccessRequests = false, showExport = false }: { role: Role; showAccessRequests?: boolean; showExport?: boolean }) {
+export function DashboardOverview({ role, showAccessRequests = false }: { role: Role; showAccessRequests?: boolean }) {
   const [data, setData] = useState<Summary | null>(null);
   const [recent, setRecent] = useState<Row[]>([]);
   const [roomNumbers, setRoomNumbers] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
-  const [exportOpen, setExportOpen] = useState(showExport);
-  const [exportMounted, setExportMounted] = useState(showExport);
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
     const get = (url: string) => fetch(url, { signal: request.signal });
     try {
       const resource = role === 'tenant' ? 'notifications' : 'maintenance';
-      const roomCountPromise = role === 'owner'
-        ? get('/api/operations?resource=rooms&page=1&pageSize=1')
-          .then(async response => response.ok ? response.json() : null).catch(() => null)
-        : Promise.resolve(null);
+      if (role === 'owner') {
+        const response = await get('/api/dashboard');
+        if (!response.ok) throw new Error();
+        const summary = await response.json();
+        if (request.isCurrent()) { setData(summary); setError(''); }
+        return;
+      }
       const roomLabelsPromise = role === 'caretaker'
         ? get('/api/operations?resource=rooms&page=1&pageSize=100')
           .then(async response => response.ok ? response.json() : null).catch(() => null)
         : Promise.resolve(null);
-      const [summary, recentResponse, roomSummary, roomLabels, pendingResponse, progressResponse] = await Promise.all([
+      const [summary, recentResponse, roomLabels, pendingResponse, progressResponse] = await Promise.all([
         get('/api/dashboard').then(async response => {
           if (!response.ok) throw new Error();
           const summary = await response.json();
           if (request.isCurrent() && role !== 'caretaker') setData({ ...summary });
           return summary;
-        }), get(`/api/operations?resource=${resource}&page=1&pageSize=8`), roomCountPromise, roomLabelsPromise,
+        }), get(`/api/operations?resource=${resource}&page=1&pageSize=8`), roomLabelsPromise,
         role === 'caretaker' ? get('/api/operations?resource=maintenance&status=pending&page=1&pageSize=1') : null,
         role === 'caretaker' ? get('/api/operations?resource=maintenance&status=in_progress&page=1&pageSize=1') : null,
       ]);
@@ -54,7 +54,6 @@ export function DashboardOverview({ role, showAccessRequests = false, showExport
       if (!recentResponse.ok) throw new Error();
       const list = await recentResponse.json();
       if (!request.isCurrent()) return;
-      if (role === 'owner') summary.total_rooms = Number.isInteger(roomSummary?.count) ? roomSummary.count : null;
       if (role === 'caretaker') {
         if (!pendingResponse?.ok || !progressResponse?.ok) throw new Error();
         const [pendingList, progressList] = await Promise.all([pendingResponse.json(), progressResponse.json()]);
@@ -70,71 +69,17 @@ export function DashboardOverview({ role, showAccessRequests = false, showExport
   useEffect(() => { const activeRequests = requests.current; const timer = window.setTimeout(() => void load(),0); return () => { window.clearTimeout(timer); activeRequests.cancel(); }; }, [load]);
   const retry = error && <p role="alert" className="dashboard-data-error">{error} <button type="button" onClick={() => void load()}>Retry</button></p>;
   if (role === 'owner') {
-    const income = (data?.income_by_currency as { currency: string; amount: number }[] | undefined) ?? [];
-    const incomeText = income.length ? income.map(item => `${item.currency} ${item.amount}`).join(' · ') : '—';
-    const totalRooms = typeof data?.total_rooms === 'number' ? data.total_rooms : null;
-    const occupancyNote = !data ? 'Rooms with residents' : totalRooms === null ? '—% Occupancy'
-      : `${totalRooms ? Math.round(number(data.occupied_rooms) / totalRooms * 100) : 0}% Occupancy`;
-    const cards = [
-      { label:'Total Rent Income', value:incomeText, note:'Approved payments', financial:true },
-      { label:'Occupied Units', value:data ? number(data.occupied_rooms) : '—', note:occupancyNote },
-      { label:'Vacant Units', value:data ? number(data.vacant_rooms) : '—', note:'Available rooms without residents' },
-      { label:'Under Maintenance', value:data ? number(data.maintenance_rooms) : '—', note:'Rooms currently unavailable' },
-    ];
-    const weekly = (data?.weekly_maintenance as { day:string; count:number }[] | undefined) ?? [];
-    const weeklyMax = Math.max(10, Math.ceil(Math.max(0,...weekly.map(day => number(day.count))) / 10) * 10);
-    const weeklyTicks = Array.from({ length: 6 }, (_, index) => weeklyMax - (weeklyMax / 5) * index);
-    const overview = statuses(data?.payment_overview);
-    const total = number(overview.paid)+number(overview.pending)+number(overview.overdue);
-    const paidPct = total ? 100*number(overview.paid)/total : 0;
-    const pendingPct = total ? 100*number(overview.pending)/total : 0;
     const actionItems = [
       { label:'Payment proofs to review', count:number(data?.pending_payments), href:'/management/payments', note:'submissions awaiting review', tone:'error' },
       { label:'Open maintenance requests', count:number(data?.pending_maintenance), href:'/management/maintenance', note:'requests need follow-up', tone:'warning' },
       { label:'Tenant access requests', count:number(data?.pending_accounts), href:'/management?accessRequests=1', note:'applications awaiting review', tone:'info' },
     ].filter(item => item.count > 0);
     return <div className="management-dashboard">
-      {exportMounted && <StorageManagementWorkspace open={exportOpen} onClose={() => setExportOpen(false)} />}
       {showAccessRequests && <AccountRequestsDialog open />}
-      <PageHeader title="Dashboard" description="Plan, prioritize, and accomplish your property tasks with ease."
-        action={<button className="dashboard-export" type="button" onClick={() => { setExportMounted(true); setExportOpen(true); }}><Icon name="download" />Export Data</button>} />
+      <PageHeader title="Dashboard"
+        action={<><Link className="dashboard-export" href="/management/storage"><Icon name="download" />Export Data</Link></>} />
       {retry}
-      <section className="dashboard-summary" aria-label="Workspace summary">{cards.map(card => <article
-        className={`dashboard-summary__item${card.financial ? ' dashboard-summary__item--financial' : ''}`} key={card.label}>
-        <h2>{card.label}</h2><span className="dashboard-summary__value">{card.value}</span><p>{card.note}</p>
-        <span className="dashboard-summary__mark" aria-hidden="true"><Icon name="arrow" /></span>
-      </article>)}</section>
-      <div className="dashboard-charts">
-        <section className="dashboard-panel dashboard-chart" aria-label="Weekly Maintenance Activity"><h2>Weekly Maintenance Activity</h2>
-          {weekly.length ? <div className="dashboard-weekly-chart" role="group" aria-label={`Weekly request chart scale: 0 to ${weeklyMax} requests per day.`}>
-            <div className="dashboard-weekly-axis" aria-hidden="true">{weeklyTicks.map(tick => <span key={tick}>{tick}</span>)}</div>
-            <div className="dashboard-weekly-bars">{weekly.map(day => <div key={day.day}>
-              <span className="dashboard-weekly-bar-track"><span className={number(day.count) > 0 ? 'has-activity' : undefined} style={{ height:`${100*Math.max(0,number(day.count))/weeklyMax}%` }} /></span>
-              <strong>{new Date(`${day.day}T00:00:00`).toLocaleDateString(undefined,{ weekday:'short' })}</strong>
-              <small>{day.count}</small>
-            </div>)}</div>
-          </div> : <div className="dashboard-chart__empty">{data ? <><Icon name="wrench" /><p>No requests in the last seven days.</p></> : <DataSkeleton label="Loading maintenance chart" variant="chart" />}</div>}
-        </section>
-        <section className="dashboard-panel dashboard-chart" aria-label="Payment Overview"><h2>Payment Overview</h2>
-          {total ? <div className="dashboard-payment-chart">
-            <div className="dashboard-payment-donut" role="img" aria-label={`${overview.paid || 0} paid, ${overview.pending || 0} pending, ${overview.overdue || 0} overdue invoices`}
-              style={{ background:`conic-gradient(var(--status-success) 0 ${paidPct}%, var(--status-warning) ${paidPct}% ${paidPct+pendingPct}%, var(--status-error) ${paidPct+pendingPct}% 100%)` }} />
-            <div className="dashboard-payment-legend">
-              <span><i className="dashboard-payment-legend__dot dashboard-payment-legend__dot--paid" aria-hidden="true" />Paid</span>
-              <span><i className="dashboard-payment-legend__dot dashboard-payment-legend__dot--pending" aria-hidden="true" />Pending</span>
-              <span><i className="dashboard-payment-legend__dot dashboard-payment-legend__dot--overdue" aria-hidden="true" />Overdue</span>
-            </div>
-          </div> : data ? <div className="dashboard-payment-chart">
-            <div className="dashboard-payment-donut dashboard-payment-donut--empty" aria-hidden="true" />
-            <div className="dashboard-payment-legend">
-              <span><i className="dashboard-payment-legend__dot dashboard-payment-legend__dot--paid" aria-hidden="true" />Paid 0</span>
-              <span><i className="dashboard-payment-legend__dot dashboard-payment-legend__dot--pending" aria-hidden="true" />Pending 0</span>
-              <span><i className="dashboard-payment-legend__dot dashboard-payment-legend__dot--overdue" aria-hidden="true" />Overdue 0</span>
-            </div>
-            <p className="dashboard-payment-chart__empty">No invoices to chart.</p>
-          </div> : <DataSkeleton label="Loading payment chart" variant="chart" />}
-        </section>
-      </div>
+      <AnalyticsWorkspace>
       <section className="dashboard-panel dashboard-actions" aria-labelledby="dashboard-actions-title"><div className="dashboard-actions__header">
         <h2 id="dashboard-actions-title">Action Required</h2><Link href="/management/notifications">View All <span aria-hidden="true">→</span></Link>
       </div>{data && actionItems.length ? <div className="dashboard-action-list">{actionItems.map(item => <Link href={item.href} key={item.label}>
@@ -143,6 +88,7 @@ export function DashboardOverview({ role, showAccessRequests = false, showExport
       </Link>)}</div>
         : data ? <p className="dashboard-actions__empty">Nothing needs attention right now.</p> : <DataSkeleton label="Loading action items" count={2} />}
       </section>
+      </AnalyticsWorkspace>
     </div>;
   }
   if (role === 'caretaker') {
@@ -152,7 +98,7 @@ export function DashboardOverview({ role, showAccessRequests = false, showExport
       ['In Progress',data ? number(data.in_progress_count) : '—','Being handled'],
       ['Urgent Requests','—','Priority not tracked'],
     ];
-    return <div className="caretaker-dashboard"><PageHeader title="Dashboard" description="Monitor and respond to tenant maintenance requests." />{retry}
+    return <div className="caretaker-dashboard"><PageHeader title="Dashboard" />{retry}
       <section className="caretaker-summary" aria-label="Maintenance request summary">{cards.map(([label,value,note]) => <article className="caretaker-summary__card" key={label}>
         <div><h2>{label}</h2><span>{value}</span><p>{note}</p></div><span className="caretaker-summary__icon" aria-hidden="true"><Icon name="arrow" /></span>
       </article>)}</section>
