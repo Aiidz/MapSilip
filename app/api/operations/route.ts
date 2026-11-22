@@ -97,9 +97,9 @@ export async function GET(request: NextRequest) {
     const tenantId = request.nextUrl.searchParams.get('tenantId') ?? '';
     if (tenantId && (!['payments','concerns'].includes(kind) || !tenantIdPattern.test(tenantId))) throw new BackendError('invalid_input');
     const recordId = request.nextUrl.searchParams.get('recordId') ?? '';
-    if (recordId && (!['payments','maintenance','concerns'].includes(kind) || !tenantIdPattern.test(recordId))) throw new BackendError('invalid_input');
+    if (recordId && (!['payments','maintenance','concerns','assignments'].includes(kind) || !tenantIdPattern.test(recordId))) throw new BackendError('invalid_input');
     const category = request.nextUrl.searchParams.get('category') ?? '';
-    const prefixes: Record<string,string> = { payments:'payment:',maintenance:'maintenance:',concerns:'concern:',accounts:'account-request:',visits:'visit:' };
+    const prefixes: Record<string,string> = { payments:'payment:',maintenance:'maintenance:',concerns:'concern:',accounts:'account-request:',visits:'visit:',contracts:'contract-expiry:' };
     if (category && (kind !== 'notifications' || !prefixes[category])) throw new BackendError('invalid_input');
     const read = request.nextUrl.searchParams.get('read') ?? '';
     if (read && (kind !== 'notifications' || !['unread','read'].includes(read))) throw new BackendError('invalid_input');

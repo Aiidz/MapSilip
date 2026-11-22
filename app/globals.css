@@ -8292,3 +8292,28 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
 @media (max-width: 600px) {
   .maintenance-feedback .button { width: 100%; }
 }
+
+.metric-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.metric-breakdown button {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.metric-breakdown button[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.metric-breakdown button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.metric-breakdown strong { font-size: 1.25rem; }

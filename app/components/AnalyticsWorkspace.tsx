@@ -1,5 +1,7 @@
 'use client';
 
+import { contractMetrics } from './ContractOverview';
+import { manilaToday } from '../lib/room-context.mjs';
 import { DashboardBreakdown } from './DashboardBreakdown';
 import { DormOverview } from './DormOverview';
 import { useEffect, useState } from 'react';
@@ -10,9 +12,7 @@ import { MetricDetails, type Metric, type MetricRecord } from './MetricDetails';
 type Row = Record<string, unknown>;
 const resources = ['maintenance', 'payments', 'invoices', 'tenants', 'rooms', 'assignments', 'concerns'] as const;
 type Records = Record<typeof resources[number], Row[]>;
-const dayInManila = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 const tenantLink = (id: unknown) => '/management/rooms?tenant=' + encodeURIComponent(String(id));
-const groupKey = (row: Row) => JSON.stringify([row.room_id, row.category]);
 const money = (amount: number, currency: unknown) => amount.toLocaleString('en-PH', { maximumFractionDigits: 2 }) + ' ' + String(currency ?? '—');
 function counts(rows: Row[], key: (row: Row) => string) {
   const result = new Map<string, number>();
@@ -38,12 +38,11 @@ export function AnalyticsWorkspace({ children }: { children: React.ReactNode }) 
   const invoices = new Map(data.invoices.map(row => [row.id, row]));
   const paid = new Map<unknown, number>();
   for (const row of data.payments) if (row.status === 'approved') paid.set(row.invoice_id, (paid.get(row.invoice_id) ?? 0) + Math.round(Number(row.amount)*100));
-  const today = dayInManila();
+  const today = manilaToday();
+  const { expiring, overview } = contractMetrics(data.assignments, data.tenants, data.rooms, today);
   const outstanding = data.invoices.filter(row => Math.round(Number(row.amount)*100) > (paid.get(row.id) ?? 0));
   const overdue = outstanding.filter(row => String(row.due_on) < today);
   const pending = data.payments.filter(row => row.status === 'pending');
-  const repeats = counts(data.maintenance, groupKey);
-  const recurring = data.maintenance.filter(row => row.room_id && (repeats.get(groupKey(row)) ?? 0) > 1);
   const tenant = (row: Row) => names.get(row.tenant_id) ?? 'Tenant';
   const repair = (row: Row): MetricRecord => {
     const status = String(row.status).replaceAll('_',' ');
@@ -54,10 +53,10 @@ export function AnalyticsWorkspace({ children }: { children: React.ReactNode }) 
   const overdueAccounts: Metric = { title:'Overdue Accounts', value:new Set(overdue.map(row => row.tenant_id)).size, note:'Tenants with outstanding rent', columns:['Tenant','Outstanding','Due date'], records:overdue.map(row => ({id:String(row.id), cells:[tenant(row), money((Math.round(Number(row.amount)*100)-(paid.get(row.id) ?? 0))/100,row.currency), String(row.due_on)], href:tenantLink(row.tenant_id)})) };
   const pendingPayments: Metric = { title:'Pending Payments', value:pending.length, note:'Awaiting verification', columns:['Tenant','Amount','Reference','Submitted'], records:pending.map(row => ({id:String(row.id),cells:[tenant(row),money(Number(row.amount), invoices.get(row.invoice_id)?.currency),String(row.reference_number ?? '—'),String(row.created_at).slice(0,10)],href:'/management/payments?search='+encodeURIComponent(String(row.reference_number || tenant(row)))})) };
   const maintenance: Metric = { title:'Maintenance Requests', value:data.maintenance.length, note:'All recorded requests', columns:repairColumns, records:data.maintenance.map(repair) };
-  const recurringIssues: Metric = { title:'Recurring Issues', value:new Set(recurring.map(groupKey)).size, note:'Repeated categories in the same room', columns:repairColumns, records:recurring.map(repair) };
+  const contractSummary: Metric = { ...expiring, breakdown: { initialTitle: 'Expiring Soon', metrics: overview } };
   const roomCounts = counts(data.assignments.filter(row => !row.ended_on), row => String(row.room_id));
   return <div className="owner-insights">
-    <MetricDetails label="Dashboard records" metrics={[overdueAccounts, pendingPayments, maintenance, recurringIssues]} />
+    <MetricDetails label="Dashboard records" metrics={[overdueAccounts, pendingPayments, maintenance, contractSummary]} />
     <DormOverview today={today} payments={data.payments} invoices={invoices} rooms={data.rooms}
       roomCounts={roomCounts} repairs={data.maintenance} tenantNames={names}>{children}</DormOverview>
     <DashboardBreakdown total={data.invoices.length} paid={data.invoices.length - outstanding.length}

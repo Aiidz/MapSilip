@@ -1,3 +1,9 @@
-import { redirect } from 'next/navigation';
+import { ContractOverview } from '../../components/ContractOverview';
+import { PageHeader } from '../../components/ui';
 
-export default function AnalyticsPage() { redirect('/management'); }
+export default function AnalyticsPage() {
+  return <>
+    <PageHeader title="Analytics" />
+    <ContractOverview />
+  </>;
+}

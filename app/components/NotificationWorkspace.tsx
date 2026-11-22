@@ -21,7 +21,7 @@ function notificationDestination(notice: Notice, area: Area) {
     : notice.href;
 }
 
-type NoticeCategory = '' | 'payments' | 'maintenance' | 'concerns' | 'accounts' | 'visits';
+type NoticeCategory = '' | 'payments' | 'maintenance' | 'concerns' | 'accounts' | 'visits' | 'contracts';
 
 const noticeCategories: { id: NoticeCategory; label: string }[] = [
   { id: '', label: 'All' },
@@ -164,7 +164,7 @@ export function NotificationWorkspace({ area }: { area: Area }) {
     <label className="notifications-search"><Icon name="search" /><span className="sr-only">Search notifications</span>
       <input type="search" placeholder="Search notifications..." value={query} onChange={event => { setQuery(event.target.value);setPage(1);setSelectedId(''); }} /></label>
     <div className="notifications-filters" role="group" aria-label="Filter notifications">
-      {noticeCategories.map(({ id, label }) => <button type="button" key={id || 'all'}
+      {(area === 'management' ? [...noticeCategories, { id: 'contracts' as const, label: 'Contracts' }] : noticeCategories).map(({ id, label }) => <button type="button" key={id || 'all'}
         aria-pressed={category===id} className={category===id ? 'is-active' : ''}
         onClick={() => { setCategory(id);setPage(1);setSelectedId(''); }}>{label}</button>)}
       <button type="button" aria-pressed={read==='unread'} className={`notifications-filters__unread${read==='unread' ? ' is-active' : ''}`}

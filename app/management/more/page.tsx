@@ -5,6 +5,7 @@ import {
 } from "../../components/ui";
 
 const links = [
+  { title: "Analytics", description: "Review current and upcoming contracts.", href: "/management/analytics", icon: "analytics" as const },
   { title: "Settings", description: "Notifications and backups.", href: "/management/settings", icon: "settings" as const },
   { title: "Payment Settings", description: "Manage the dormitory’s GCash QR.", href: "/management/settings/payments", icon: "wallet" as const },
   { title: "Concerns & Suggestions", description: "Review resident feedback and respond.", href: "/management/concerns", icon: "sparkles" as const },

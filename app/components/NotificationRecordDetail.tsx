@@ -7,10 +7,10 @@ const display = (value: unknown) => value == null || value === '' ? '—' : Stri
 
 /** Shows read-only context; workflow changes belong on the linked full page. */
 export function NotificationRecordDetail({ eventKey }: { eventKey: string }) {
-  const match = /^(payment|maintenance|concern):([0-9a-f-]{36}):/i.exec(eventKey);
+  const match = /^(payment|maintenance|concern|contract-expiry):([0-9a-f-]{36}):/i.exec(eventKey);
   const kind = match?.[1];
   const id = match?.[2];
-  const resource = kind === 'payment' ? 'payments' : kind === 'concern' ? 'concerns' : 'maintenance';
+  const resource = kind === 'payment' ? 'payments' : kind === 'concern' ? 'concerns' : kind === 'contract-expiry' ? 'assignments' : 'maintenance';
   const [record, setRecord] = useState<Row | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -32,7 +32,11 @@ export function NotificationRecordDetail({ eventKey }: { eventKey: string }) {
   if (!match) return null;
   return <section className="notification-record" aria-label="Related record" aria-busy={loading}>
     {message && <p role="status">{message}</p>}
-    {loading ? <p role="status">Loading details…</p> : !record ? <p>Record unavailable. <button type="button" onClick={() => { setLoading(true); setMessage(''); void load(); }}>Retry</button></p> : <>
+    {loading ? <p role="status">Loading details…</p> : !record ? <p>Record unavailable. <button type="button" onClick={() => { setLoading(true); setMessage(''); void load(); }}>Retry</button></p> : kind === 'contract-expiry' ? <dl>
+      <div><dt>Contract starts</dt><dd>{display(record.started_on)}</dd></div>
+      <div><dt>Contract ends</dt><dd>{display(record.contract_end_on)}</dd></div>
+      <div><dt>Monthly rent</dt><dd>{record.contract_monthly_rent == null ? '—' : Number(record.contract_monthly_rent).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })}</dd></div>
+    </dl> : <>
       <dl><div><dt>Current status</dt><dd>{display(record.status).replaceAll('_',' ')}</dd></div>
       {kind === 'payment' ? <><div><dt>Amount</dt><dd>{display(record.amount)}</dd></div><div><dt>Method</dt><dd>{display(record.method)}</dd></div><div><dt>Reference</dt><dd>{display(record.reference_number)}</dd></div></> : <div><dt>Category</dt><dd>{display(record.category)}</dd></div>}</dl>
       {Boolean(record.description) && <p>{display(record.description)}</p>}
