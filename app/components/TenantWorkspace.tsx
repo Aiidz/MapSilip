@@ -1,5 +1,6 @@
 'use client';
 
+import { manilaToday } from '../lib/room-context.mjs';
 import { uploadAttachment } from '../lib/uploads/client';
 import { CloseIcon } from "./CloseIcon";
 
@@ -48,14 +49,17 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
 
   // Form field states
-  const [invoiceIds, setInvoiceIds] = useState<string[]>([]);
+  const [invoiceIds, setInvoiceIds] = useState<string[] | null>(null);
   const [method, setMethod] = useState('gcash');
   const [cashRecipient, setCashRecipient] = useState('');
   const [qrReady, setQrReady] = useState(false);
   const [category, setCategory] = useState(kind === 'maintenance' ? 'Furniture & Fixtures' : 'Cleanliness & Sanitation');
 
   const sortedInvoices = [...invoices].sort((a, b) => String(a.coverage_start).localeCompare(String(b.coverage_start)));
-  const selectedInvoices = sortedInvoices.filter(row => invoiceIds.includes(String(row.id)));
+  const currentMonth = manilaToday().slice(0, 7);
+  const currentInvoice = sortedInvoices.find(row => String(row.coverage_start).startsWith(currentMonth));
+  const selectedIds = invoiceIds ?? (currentInvoice ? [String(currentInvoice.id)] : []);
+  const selectedInvoices = sortedInvoices.filter(row => selectedIds.includes(String(row.id)));
   const amountInCentavos = selectedInvoices.reduce((total, row) => total + Math.round(Number(row.amount) * 100), 0);
 
   const methodOptions = [
@@ -99,7 +103,7 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
           method, cash_recipient: method === 'cash' ? cashRecipient : null,
           reference_number: fields.get('reference_number'), attachment_id: attachmentId,
         });
-        setInvoiceIds([]);
+        setInvoiceIds(null);
       } else if (kind === 'maintenance') {
         const file = fields.get('file');
         const attachmentId = file instanceof File && file.size ? await uploadAttachment(file,'maintenance') : null;
@@ -126,27 +130,38 @@ function SubmissionForm({ kind, invoices, open, onClose, onSaved }: {
       <form onSubmit={submit} className="tenant-modal-form">
         {kind === 'payments' ? (
           <>
-            <fieldset className="tenant-payment-periods" disabled={busy}>
-              <legend>Payment periods</legend>
-              {sortedInvoices.length ? sortedInvoices.map(row => {
-                const id = String(row.id);
-                const checked = invoiceIds.includes(id);
-                return <label key={id} className="tenant-payment-period">
-                  <input type="checkbox" checked={checked} disabled={!checked && selectedInvoices.length >= 12}
-                    onChange={event => {
-                      const add = event.target.checked;
-                      setInvoiceIds(current => add ? [...current, id] : current.filter(value => value !== id));
-                      setRequestKey(crypto.randomUUID());
-                    }} />
-                  <span><strong>{paymentMonth(row.coverage_start)}</strong>
-                    <small>{periodDate.formatRange(new Date(String(row.coverage_start)), new Date(String(row.coverage_end)))}</small>
-                  </span>
-                  <strong>{paymentAmount(row.amount, row.currency)}</strong>
-                </label>;
-              }) : <p>No invoices available.</p>}
-            </fieldset>
+            <section className="tenant-payment-picker" aria-label="Payment period">
+              <div className="tenant-payment-current">
+                <span><small>This month</small><strong>{paymentMonth(currentMonth + '-01')}</strong></span>
+                <strong>{currentInvoice ? paymentAmount(currentInvoice.amount, currentInvoice.currency) : 'No bill available'}</strong>
+              </div>
+              {sortedInvoices.length > 0 && <details className="tenant-payment-expand">
+                <summary><span><strong>Select payment periods</strong><small>View other months and pay early</small></span>
+                  <Icon name="chevron" />
+                </summary>
+                <fieldset className="tenant-payment-periods" disabled={busy}>
+                  <legend className="sr-only">Available payment periods</legend>
+                  {sortedInvoices.map(row => {
+                    const id = String(row.id);
+                    const checked = selectedIds.includes(id);
+                    return <label key={id} className="tenant-payment-period">
+                      <input type="checkbox" checked={checked} disabled={!checked && selectedInvoices.length >= 12}
+                        onChange={event => {
+                          const add = event.target.checked;
+                          setInvoiceIds(add ? [...selectedIds, id] : selectedIds.filter(value => value !== id));
+                          setRequestKey(crypto.randomUUID());
+                        }} />
+                      <span><strong>{paymentMonth(row.coverage_start)}</strong>
+                        <small>{periodDate.formatRange(new Date(String(row.coverage_start)), new Date(String(row.coverage_end)))}</small>
+                      </span>
+                      <strong>{paymentAmount(row.amount, row.currency)}</strong>
+                    </label>;
+                  })}
+                </fieldset>
+              </details>}
+            </section>
             <div className="tenant-payment-total" aria-live="polite">
-              <span>Total to pay</span><strong>{paymentAmount(amountInCentavos / 100)}</strong>
+              <span>Total to pay{selectedInvoices.length > 1 ? ` · ${selectedInvoices.length} periods` : ''}</span><strong>{paymentAmount(amountInCentavos / 100)}</strong>
             </div>
             <label>
               <span>Payment method</span>

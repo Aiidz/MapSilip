@@ -8325,3 +8325,14 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
 .tenant-payment-period span { display: grid; gap: 2px; }
 .tenant-payment-period small { overflow-wrap: anywhere; }
 .tenant-payment-total { display: flex; justify-content: space-between; gap: 12px; padding: 12px; background: var(--surface-soft); border-radius: var(--radius-control); color: var(--text); }
+.tenant-payment-picker { border: 1px solid var(--border); border-radius: var(--radius-control); }
+.tenant-payment-current,
+.tenant-payment-expand > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; }
+.tenant-payment-current > span, .tenant-payment-expand > summary > span { display: grid; gap: 2px; }
+.tenant-payment-current small, .tenant-payment-expand small { color: var(--text-muted); }
+.tenant-payment-expand { border-top: 1px solid var(--border); }
+.tenant-payment-expand > summary { cursor: pointer; list-style: none; min-height: 48px; }
+.tenant-payment-expand > summary::-webkit-details-marker { display: none; }
+.tenant-payment-expand > summary svg { width: 16px; height: 16px; flex: none; }
+.tenant-payment-expand[open] > summary svg { transform: rotate(180deg); }
+.tenant-payment-expand .tenant-payment-periods { padding: 0 10px 4px; }
