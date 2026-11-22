@@ -103,9 +103,18 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
     ['Available Slots',available,'Slots open for assignment'],
     ['Tenants to Assign',tenants.filter(tenant => tenant.status === 'active' && !activeAssignment(tenant.user_id)).length,'Awaiting room assignment'],
   ];
+  const roomsById = new Map(rooms.map(room => [room.id, room]));
+  const tenantRooms = new Map(occupied.map(assignment => [assignment.tenant_id, roomsById.get(assignment.room_id)]));
+  const roomNumberOf = (tenantId: unknown) => String(tenantRooms.get(tenantId)?.room_number ?? '').trim().replace(/^room\s+/i, '');
   const people = tenants.filter(tenant => {
-    if (filter !== 'all' && filter !== 'rooms' && roomOf(tenant.user_id)?.floor_label !== filter) return false;
+    if (filter !== 'all' && filter !== 'rooms' && tenantRooms.get(tenant.user_id)?.floor_label !== filter) return false;
     return String(tenant.display_name || '').toLowerCase().includes(search.toLowerCase());
+  }).sort((a, b) => {
+    const roomA = roomNumberOf(a.user_id);
+    const roomB = roomNumberOf(b.user_id);
+    return Number(!roomA) - Number(!roomB)
+      || roomA.localeCompare(roomB, undefined, { numeric: true })
+      || String(a.display_name ?? '').localeCompare(String(b.display_name ?? ''));
   });
   const roomResults = rooms.filter(room => String(room.room_number || '').toLowerCase().includes(search.toLowerCase()));
   const selectedAssignment = selected?.user_id ? activeAssignment(selected.user_id) : undefined;
@@ -210,9 +219,13 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
         </div>}
       </div>
         <label className="tenant-list-search"><Icon name="search" /><input aria-label={filter==='rooms'?'Search rooms':'Search tenants'} placeholder={filter==='rooms'?'Search room...':'Search tenant...'} value={search} onChange={event => setSearch(event.target.value)} /></label>
-        {loading && !rooms.length && !tenants.length ? <DataSkeleton /> : (filter==='rooms' ? roomResults : people).length ? <div className="room-list-records">{(filter==='rooms' ? roomResults : people).map(row => <button type="button" key={String(row.id || row.user_id)} className="room-list-record" onClick={() => { if (filter==='rooms') { tenantSelection.current += 1;setSelected(row);setForm(null); } else void selectTenant(row); }}>
-          {filter === 'rooms' ? <span className="room-list-avatar">{String((filter==='rooms' ? row.room_number : row.display_name) || '?').slice(0,1).toUpperCase()}</span> : <ProfilePhoto key={String(row.user_id ?? row.id)} className="room-list-avatar" userId={filter === 'rooms' ? undefined : String(row.user_id)} fallback={String((filter==='rooms' ? row.room_number : row.display_name) || '?').slice(0,1).toUpperCase()} />}<span><strong>{value(filter==='rooms' ? row.room_number : row.display_name)}</strong><small>{filter==='rooms' ? `${row.floor_label} · ${row.capacity} slots` : slotOf(row.user_id) ? `Slot ${slotOf(row.user_id)}` : 'Awaiting room assignment'}</small></span>
-        </button>)}</div> : <p className="tenant-list-empty">No records to display.</p>}
+        {loading && !rooms.length && !tenants.length ? <DataSkeleton /> : (filter==='rooms' ? roomResults : people).length ? <div className="room-list-records">{(filter==='rooms' ? roomResults : people).map(row => {
+          const roomNumber = roomNumberOf(row.user_id);
+          const roomLabel = roomNumber ? `Room ${roomNumber}` : 'Awaiting room assignment';
+          const name = value(filter === 'rooms' ? row.room_number : row.display_name);
+          return <button type="button" key={String(row.id || row.user_id)} className="room-list-record" onClick={() => { if (filter==='rooms') { tenantSelection.current += 1;setSelected(row);setForm(null); } else void selectTenant(row); }}>
+          {filter === 'rooms' ? <span className="room-list-avatar">{String((filter==='rooms' ? row.room_number : row.display_name) || '?').slice(0,1).toUpperCase()}</span> : <ProfilePhoto key={String(row.user_id ?? row.id)} className="room-list-avatar" userId={filter === 'rooms' ? undefined : String(row.user_id)} fallback={String((filter==='rooms' ? row.room_number : row.display_name) || '?').slice(0,1).toUpperCase()} />}<span><strong title={name}>{name}</strong><small>{filter==='rooms' ? `${row.floor_label} · ${row.capacity} slots` : roomLabel}</small></span>
+        </button>; })}</div> : <p className="tenant-list-empty">No records to display.</p>}
       </aside>
       <MobileDetailSurface open={Boolean(selected)} onClose={() => { tenantSelection.current += 1; setSelected(null); setForm(null); }} title={movingInSheet ? assignmentTitle : filter === 'rooms' ? 'Room Details' : 'Tenant Details'}>{movingInSheet ? assignmentForm : <section className="tenant-details-panel" aria-labelledby="tenant-details-title"><header className="detail-header payment-details-heading"><h2 id="tenant-details-title">{filter==='rooms'?'Room Details':'Tenant Details'}</h2>{selected && <button type="button" className="detail-header__close" aria-label="Close details" onClick={() => { tenantSelection.current += 1;setSelected(null); }}><CloseIcon /></button>}</header>
         {selected ? <div className="room-selected-details">

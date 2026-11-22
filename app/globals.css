@@ -4609,8 +4609,9 @@ button.room-context__person:hover, button.room-context__person:focus-visible { b
 .payment-detail-form, .payment-selected-details { padding: 1rem; }
 .payment-selected-details p { overflow-wrap: anywhere; }
 .room-list-records { display: grid; gap: .3rem; padding: .4rem; }
-.room-list-record { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .45rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+.room-list-record { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 64px; padding: .45rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
 .room-list-record > span:last-child { display: grid; gap: .15rem; min-width: 0; }
+.room-list-record :is(strong, small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-list-record small { color: var(--text-muted); }
 .room-list-avatar { flex: 0 0 2.1rem; display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 50%; background: var(--brand); color: white; }
 .room-list-add { margin: .6rem; }
