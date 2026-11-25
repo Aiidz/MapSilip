@@ -10,16 +10,13 @@ import { AccountRequestForm } from "./AccountRequestForm";
 export function AuthPreview({ request = false, firstLogin = false, recovery = false, reset = false, refineLogin = false, refineAuth = false }: {
   request?: boolean; firstLogin?: boolean; recovery?: boolean; reset?: boolean; refineLogin?: boolean; refineAuth?: boolean;
 }) {
-  const [requestStage, setRequestStage] = useState<'details' | 'rooms' | 'sent'>('details');
   const [recoverySent, setRecoverySent] = useState(false);
-  const title = request ? requestStage === "sent" ? "Request sent" : requestStage === "rooms" ? "Choose a room" : "Create Account" : firstLogin ? "Change Password" : recovery ? recoverySent ? "Check your email" : "Reset Password" : reset ? "Choose a New Password" : "Log In";
+  const title = request ? "Create Account" : firstLogin ? "Change Password" : recovery ? recoverySent ? "Check your email" : "Reset Password" : reset ? "Choose a New Password" : "Log In";
   const pageClass = [
     "auth-page",
     refineLogin ? "auth-page--login" : refineAuth ? "auth-page--refined" : "",
     request && refineAuth ? "auth-page--request" : "",
-    request && requestStage === "rooms" ? "auth-page--room-choice" : "",
   ].filter(Boolean).join(" ");
-
   return (
     <main className={pageClass}>
       <div className="auth-orb auth-orb--top" aria-hidden="true" />
@@ -27,54 +24,28 @@ export function AuthPreview({ request = false, firstLogin = false, recovery = fa
       <div className="auth-orb auth-orb--dark" aria-hidden="true" />
       <section className={`auth-card${request ? " auth-card--request" : ""}`}>
         <aside className="auth-brand-panel">
-          {/* Full-bleed dorm photo */}
-          <div className="auth-brand-photo" aria-hidden="true">
+          <Link className="auth-brand" href="/" aria-label="MapSilip home">
             <Image
-              src="/dorm-bg.jpg"
-              alt="Mathea's Dormitory"
-              fill
-              sizes="(max-width:899px) 100vw, 50vw"
-              style={{ objectFit: "cover", objectPosition: "center 35%" }}
-              priority
+              className="auth-brand__logo"
+              src="/mapsilip-logo-combi.svg"
+              alt=""
+              width="1073"
+              height="419"
+              unoptimized
             />
-            <div className="auth-brand-photo__overlay" />
-          </div>
-
-          {/* Centered Real Mathea's Dormitory circular badge */}
-          <div className="auth-dorm-badge" aria-label="Mathea's Dormitory">
-            <Image
-              src="/matheas-real-logo.png"
-              alt="Mathea's Dormitory"
-              width={640}
-              height={640}
-              className="auth-dorm-badge__img"
-              priority
-            />
-          </div>
-
-          {/* Bottom: Powered by MapSilip footer */}
-          <div className="auth-brand-footer">
-            <span className="auth-powered-by">powered by</span>
-            <Link className="auth-brand" href="/" aria-label="MapSilip home">
-              <Image
-                className="auth-brand__logo"
-                src="/mapsilip-logo-real.svg"
-                alt="MapSilip"
-                width={1073}
-                height={419}
-                unoptimized
-              />
-            </Link>
-            <p className="auth-product-name">Dormitory Management System</p>
-          </div>
+          </Link>
+          <p className="auth-product-name">Dormitory Management System</p>
+          {(refineLogin
+            ? <p className="auth-greeting">Hello,<br /><strong>welcome!</strong></p>
+            : <h1>Hello,<br /><strong>welcome!</strong></h1>)}
         </aside>
         <section className="auth-form-side" aria-labelledby={refineLogin ? "login-heading" : undefined}>
           <div className="auth-form-card">
             {refineLogin ? <h1 id="login-heading">{title}</h1> : <h2>{title}</h2>}
-            {!request && !(recovery && recoverySent) && <p className="auth-form-card__intro">{request ? "Fill in your details to get started." : firstLogin ? "Replace your temporary password to continue." : recovery ? "Enter your account email to request a password reset link." : reset ? "Choose a new password for your account." : "Enter your email and password to access MapSilip."}</p>}
+            {!(recovery && recoverySent) && <p className="auth-form-card__intro">{request ? "Fill in your details to get started." : firstLogin ? "Replace your temporary password to continue." : recovery ? "Enter your account email to request a password reset link." : reset ? "Choose a new password for your account." : "Enter your email and password to access MapSilip."}</p>}
             {request ? (
               <>
-                <AccountRequestForm onStageChange={setRequestStage} />
+                <AccountRequestForm />
                 <p className="auth-switch">Already have an account? <Link href="/login">Log In</Link></p>
               </>
             ) : firstLogin ? (

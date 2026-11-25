@@ -100,11 +100,11 @@ export function LoginForm() {
         autoCorrect="off" value={email} onChange={event => setEmail(event.target.value)} required maxLength={320} />
     </label>
     <PasswordField id="login-password" label="Password" value={password} onChange={setPassword} autoComplete="current-password" />
+    <Link className="auth-recovery-link" href="/forgot-password">Forgot password?</Link>
     {error && <Status>{error}</Status>}
     <button className="auth-submit" type="submit" disabled={busy} aria-busy={busy}>
       {busy ? "Signing in…" : "Log In"}
     </button>
-    <Link className="auth-recovery-link" href="/forgot-password">Forgot password?</Link>
   </form>;
 }
 
