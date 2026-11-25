@@ -1,4 +1,8 @@
+import { parseEmergencyContact } from '../../lib/emergency-contact';
+import { TenantContractRenewal } from '../../components/TenantContractRenewal';
+import { PaymentProofViewer } from '../../components/PaymentProofViewer';
 import { Icon } from "../../components/Icon";
+import { genderLabel } from "../../lib/tenant-gender";
 import Link from 'next/link';
 import { getTenantProfile } from "../../lib/backend/tenant";
 
@@ -9,19 +13,23 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 
 export default async function TenantDetailsPage() {
   const profile = await getTenantProfile();
+  const emergencyContact = parseEmergencyContact(profile.emergencyContact ?? '');
   const initials = profile.displayName?.trim().split(/\s+/).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase() || 'T';
   return <div className="tenant-details-page tenant-my-details">
     <header className="tenant-details-heading"><h1>My Details</h1><p>View your personal information, room and contract.</p></header>
     <section className="tenant-details-identity"><span>{initials}</span><div><strong>{show(profile.displayName)}</strong><small>Tenant ID: {profile.userId}</small></div></section>
     <div className="tenant-my-details-grid">
       <section className="tenant-my-details-card"><h2>Personal Information</h2>
-        <dl><Field label="Full Name" value={profile.displayName} /><Field label="Contact Number" value={profile.phone} /><Field label="Email Address" value={profile.email} /><Field label="Home Address" /><Field label="Tenant ID" value={profile.userId} /></dl>
-        <hr /><h3>Emergency Contact</h3><dl><Field label="Contact Name" value={profile.emergencyContact} /><Field label="Relationship" /><Field label="Contact Number" /></dl>
-        <aside className="tenant-details-update"><Icon name="info" /><div><strong>Need to update your information?</strong><p>Please contact the dormitory admin for changes to your personal details.</p><Link href="/tenant/profile" className="button button--secondary">Request an Update</Link></div></aside>
+        <dl><Field label="Full Name" value={profile.displayName} /><Field label="Gender" value={genderLabel(profile.gender)} /><Field label="Contact Number" value={profile.phone} /><Field label="Email Address" value={profile.email} /><Field label="Tenant ID" value={profile.userId} /></dl>
+        <hr /><h3>Emergency Contact</h3>
+        <dl><Field label="Name" value={emergencyContact.name} /><Field label="Relationship" value={emergencyContact.relationship} /><Field label="Phone Number" value={emergencyContact.phone} /></dl>
+        <Link href="/tenant/profile#emergency-contact" className="button button--secondary">
+          {profile.emergencyContact ? 'Edit emergency contact' : 'Add emergency contact'}
+        </Link>
       </section>
       <section className="tenant-my-details-card tenant-contract-card"><h2>Contract Details</h2><dl>
         <Field label="Room Assignment" value={profile.roomNumber ? `Room ${profile.roomNumber}` : null} /><Field label="Contract Start Date" value={profile.startedOn} /><Field label="Contract End Date" value={profile.contractEndOn} /><Field label="Monthly Rent" value={profile.monthlyRent == null ? null : new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(profile.monthlyRent)} /><Field label="Contract Document" value={profile.contractAttachmentId ? 'Linked' : 'Not linked'} />
-      </dl><div className="tenant-contract-document"><Icon name="fileSearch" />{profile.contractAttachmentId ? <a href={`/api/attachments?id=${encodeURIComponent(profile.contractAttachmentId)}`}>View rental contract</a> : <span>Rental contract not linked</span>}</div></section>
+      </dl>{profile.contractAttachmentId ? <PaymentProofViewer key={profile.contractAttachmentId} attachmentId={profile.contractAttachmentId} kind="contract" /> : <div className="tenant-contract-document"><Icon name="fileSearch" /><span>Rental contract not linked</span></div>}<TenantContractRenewal /></section>
     </div>
   </div>;
 }

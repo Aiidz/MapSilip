@@ -1,0 +1,116 @@
+.workspace {
+  width: 100%;
+}
+
+.topGrid,
+.lowerGrid {
+  display: grid;
+  gap: 1rem;
+  align-items: stretch;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-block: 1rem;
+}
+
+.panel { padding: clamp(1rem, 2vw, 1.375rem); }
+.panel p { margin-block: 0.5rem; }
+
+.actions,
+.statusLine,
+.jobSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  align-items: center;
+}
+
+.actions { margin-block: 1rem 0.625rem; }
+.statusLine { font-size: 0.8125rem; color: var(--text-muted); }
+
+.button { color: var(--text); text-decoration: none; }
+.button:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-soft); }
+.button.primary:not(:disabled) { background: var(--brand-deep); border-color: var(--brand-deep); color: white; }
+.button:disabled { color: var(--text-muted); background: var(--surface-soft); }
+
+.hint { color: var(--text-muted); font-size: 0.8125rem; line-height: 1.5; }
+
+.warning {
+  border-radius: var(--radius-control);
+  padding: 0.625rem 0.75rem;
+  color: var(--status-warning);
+  background: var(--status-warning-bg);
+  font-size: 0.8125rem;
+}
+
+.schedule {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  padding-top: 0.875rem;
+  margin-top: 1rem;
+}
+
+.schedule p,
+.jobSummary p { margin-block: 0.125rem 0; }
+
+.empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-control);
+  padding: 1.125rem;
+}
+
+.jobs { padding: 0; margin: 0; list-style: none; }
+.job + .job { border-top: 1px solid var(--border); }
+.job { padding-block: 0.875rem; min-inline-size: 0; }
+.job:first-child { padding-top: 0; }
+.jobSummary { justify-content: space-between; }
+.jobSummary strong { font-variant-numeric: tabular-nums; }
+
+.destinations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  border-block: 1px solid var(--border);
+  padding-block: 0.625rem;
+  margin-block: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.destinations dt { color: var(--text-muted); }
+.destinations dd { margin: 0.25rem 0 0; font-weight: 650; }
+@media (max-width: 680px) {
+  .topGrid, .lowerGrid { gap: 0.75rem; margin-block: 0.75rem; }
+}
+
+.panel :global(.panel__icon) { color: var(--text-muted); }
+
+@media (max-width: 680px) {
+  .actions .button { width: auto; }
+}
+
+.jobTools { display: flex; flex-wrap: wrap; align-items: center; }
+.dialogBody { padding: 1rem; overflow-wrap: anywhere; }
+.dialogBody pre { white-space: pre-wrap; padding: .75rem; background: var(--surface-soft); border-radius: var(--radius-control); }
+.dialogBody textarea { display: block; width: 100%; min-height: 6rem; margin: .5rem 0; }
+.editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin: 0 0 .75rem; }
+.scheduleFields label { display: grid; gap: .25rem; font-size: .8125rem; }
+.scheduleFields input { min-width: 0; width: 100%; padding: .5rem; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-control); }
+.editor > button { justify-self: start; }
+.segments { min-width: 0; padding: 3px; margin: 0; border: none; border-radius: var(--radius-control); background: var(--surface-soft); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; }
+.segments legend { padding: 0 .25rem; margin-bottom: .375rem; font-size: .8125rem; color: var(--text-muted); }
+.segments label { position: relative; }
+.segments input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; opacity: 0; }
+.segments span { display: grid; min-height: 44px; place-items: center; border-radius: calc(var(--radius-control) - 3px); font-weight: 650; text-transform: capitalize; cursor: pointer; }
+.segments input:checked + span { background: var(--surface-raised); box-shadow: 0 1px 3px rgb(0 0 0 / 18%); }
+.segments input:focus-visible + span { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.months { grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.scheduleFields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: .75rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .segments span { transition: background-color var(--motion-feedback), transform var(--motion-feedback); }
+  .segments span:active { transform: scale(.96); }
+}
+@media (max-width: 860px) {
+  .topGrid, .lowerGrid { grid-template-columns: minmax(0, 1fr); }
+}

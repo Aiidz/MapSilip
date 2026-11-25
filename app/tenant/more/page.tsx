@@ -1,6 +1,3 @@
-"use client";
-
-import { useRouter } from "next/navigation";
 import {
   PageHeader,
   Panel,
@@ -33,24 +30,14 @@ const links = [
     icon: "calendar" as const,
   },
   {
-    title: "Notification settings",
-    description: "A place for optional app preferences.",
-    href: "/tenant/preferences",
-    icon: "bell" as const,
+    title: "Settings",
+    description: "Manage device notifications.",
+    href: "/tenant/settings",
+    icon: "settings" as const,
   },
 ];
 
 export default function TenantMorePage() {
-  const router = useRouter();
-
-  function openNotificationSettings() {
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      window.dispatchEvent(new Event("mapsilip-open-app-settings"));
-      return;
-    }
-    router.push("/tenant/preferences");
-  }
-
   return (
     <>
       <PageHeader
@@ -63,7 +50,7 @@ export default function TenantMorePage() {
         icon="more"
       >
         <div className="preview-card-list">
-          {links.map((item) => <PreviewCard key={item.href} {...item} onClick={item.href === "/tenant/preferences" ? openNotificationSettings : undefined} />)}
+          {links.map((item) => <PreviewCard key={item.href} {...item} />)}
         </div>
       </Panel>
     </>

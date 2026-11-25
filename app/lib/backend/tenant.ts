@@ -12,7 +12,7 @@ export const getTenantAccess = cache(async function getTenantAccess() {
   const session = await verifyAuthSession(client.auth);
   const identity = session.identity;
   const { data, error } = await client.from('tenant_profiles')
-    .select('user_id, display_name, phone, emergency_contact, status').eq('user_id', identity.userId).maybeSingle();
+    .select('user_id, display_name, gender, phone, emergency_contact, status').eq('user_id', identity.userId).maybeSingle();
   if (error) throw new BackendError('unavailable');
   if (!data) throw new BackendError('forbidden');
   authorizeTenantProfile(identity, data);
@@ -31,7 +31,7 @@ export const getTenantProfile = cache(async function getTenantProfile() {
   if (assignment.error || invoice.error) throw new BackendError('unavailable');
   const room = assignment.data?.rooms as { room_number?: string; monthly_rent?: number | null } | { room_number?: string; monthly_rent?: number | null }[] | null | undefined;
   return Object.freeze({ userId: identity.userId, displayName: data.display_name, email: session.email,
-    phone: data.phone, emergencyContact: data.emergency_contact,
+    gender: data.gender, phone: data.phone, emergencyContact: data.emergency_contact,
     roomNumber: Array.isArray(room) ? room[0]?.room_number : room?.room_number,
     startedOn: assignment.data?.started_on,
     contractAttachmentId: assignment.data?.contract_attachment_id,

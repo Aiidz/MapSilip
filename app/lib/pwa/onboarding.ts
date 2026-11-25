@@ -13,8 +13,9 @@ export function saveDecision(scope: string, decision: 'done' | 'later' | 'enable
   try { storage?.setItem(prefix + scope, decision); } catch { /* Keep the current-session decision. */ }
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(onboardingChanged));
 }
-export function setupStage(input: {photoDone: boolean; notificationDone: boolean; installDone: boolean; standalone: boolean; installEligible: boolean}): 'profile' | 'notifications' | 'invite' | null {
+export function setupStage(input: {photoDone: boolean; contactNeeded?: boolean; notificationDone: boolean; installDone: boolean; standalone: boolean; installEligible: boolean}): 'contact' | 'profile' | 'notifications' | 'invite' | null {
   if (!input.photoDone) return 'profile';
+  if (input.contactNeeded) return 'contact';
   if (!input.standalone && !input.installDone && input.installEligible) return 'invite';
   if (!input.notificationDone) return 'notifications';
   return null;

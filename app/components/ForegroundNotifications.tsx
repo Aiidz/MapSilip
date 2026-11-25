@@ -9,11 +9,43 @@ export function ForegroundNotifications({ userId, mobile }: { userId: string; mo
     let alive = true;
     let connection = 0;
     let stream: EventSource | undefined;
+    let audio: AudioContext | undefined;
+    let lastChime = -Infinity;
+
+    function unlockSound() {
+      if (typeof AudioContext === 'undefined') return;
+      try {
+        audio ??= new AudioContext();
+        if (audio.state === 'suspended') void audio.resume().catch(() => {});
+      } catch { /* Browser audio is optional. */ }
+    }
+
+    function playSound() {
+      if (!audio || audio.state !== 'running' || document.visibilityState !== 'visible' ||
+          !document.hasFocus() || audio.currentTime - lastChime < 0.6) return false;
+      try {
+        const start = audio.currentTime;
+        const tone = audio.createOscillator();
+        const volume = audio.createGain();
+        tone.frequency.setValueAtTime(660, start);
+        tone.frequency.setValueAtTime(880, start + 0.09);
+        volume.gain.setValueAtTime(0.001, start);
+        volume.gain.exponentialRampToValueAtTime(0.12, start + 0.025);
+        volume.gain.exponentialRampToValueAtTime(0.001, start + 0.23);
+        tone.connect(volume);
+        volume.connect(audio.destination);
+        tone.start(start);
+        tone.stop(start + 0.24);
+        lastChime = start;
+        return true;
+      } catch { return false; }
+    }
+
     const alerts = new Set<Notification>();
     const accept = createNoticeGuard(userId);
     function closeAlerts() { for (const alert of alerts) alert.close(); alerts.clear(); }
     function optedIn() { try { return readForegroundEnabled(window.localStorage, userId); } catch { return false; } }
-    async function showDesktopAlert(id: string) {
+    async function showDesktopAlert(id: string, silent: boolean) {
       if (!alive || mobile || typeof Notification === 'undefined' || Notification.permission !== 'granted' || !optedIn()) return;
       const display = async () => {
         if (!alive || Notification.permission !== 'granted' || !optedIn()) return;
@@ -21,7 +53,7 @@ export function ForegroundNotifications({ userId, mobile }: { userId: string; mo
         let seen: string[] = [];
         try { const saved: unknown = JSON.parse(window.localStorage.getItem(key) ?? '[]'); if (Array.isArray(saved)) seen = saved.filter((item): item is string => typeof item === 'string').slice(-100); } catch { /* The in-memory guard and notification tag still bound duplicates. */ }
         if (seen.includes(id)) return;
-        const alert = new Notification('MapSilip', { body: 'You have a new update.', icon: '/icon-192.png', tag: `mapsilip:${id}` });
+        const alert = new Notification('MapSilip', { body: 'You have a new update.', icon: '/icon-192.png', tag: `mapsilip:${id}`, silent });
         try { window.localStorage.setItem(key, JSON.stringify([...seen, id].slice(-100))); } catch { /* Storage failure must not break in-app updates. */ }
         if (alerts.size >= 20) { const oldest = alerts.values().next().value!; oldest.close(); alerts.delete(oldest); }
         alerts.add(alert);
@@ -45,9 +77,11 @@ export function ForegroundNotifications({ userId, mobile }: { userId: string; mo
         let row: unknown;
         try { row = JSON.parse(event.data); } catch { return; }
         if (!accept(row)) return;
-        window.dispatchEvent(new Event(foregroundNotificationReceivedEvent));
+        window.dispatchEvent(new CustomEvent(foregroundNotificationReceivedEvent, {
+          detail: (row as { kind?: string }).kind,
+        }));
         window.dispatchEvent(new Event('mapsilip-notifications-updated'));
-        void showDesktopAlert(String((row as { id: string }).id));
+        void showDesktopAlert(String((row as { id: string }).id), playSound());
       });
       stream.addEventListener('ready', () => {
         if (alive && generation === connection) window.dispatchEvent(new Event('mapsilip-notifications-updated'));
@@ -58,6 +92,8 @@ export function ForegroundNotifications({ userId, mobile }: { userId: string; mo
     }
     function visibilityChanged() { if (mobile) connect(); }
     connect();
+    document.addEventListener('click', unlockSound, true);
+    document.addEventListener('keydown', unlockSound, true);
     window.addEventListener(foregroundSettingsEvent, settingsChanged);
     window.addEventListener('storage', settingsChanged);
     document.addEventListener('visibilitychange', visibilityChanged);
@@ -65,6 +101,9 @@ export function ForegroundNotifications({ userId, mobile }: { userId: string; mo
       alive = false; connection++;
       stream?.close();
       closeAlerts();
+      document.removeEventListener('click', unlockSound, true);
+      document.removeEventListener('keydown', unlockSound, true);
+      if (audio) void audio.close().catch(() => {});
       window.removeEventListener(foregroundSettingsEvent, settingsChanged);
       window.removeEventListener('storage', settingsChanged);
       document.removeEventListener('visibilitychange', visibilityChanged);

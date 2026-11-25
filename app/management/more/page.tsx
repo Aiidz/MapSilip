@@ -5,8 +5,9 @@ import {
 } from "../../components/ui";
 
 const links = [
+  { title: "Settings", description: "Notifications and backups.", href: "/management/settings", icon: "settings" as const },
+  { title: "Payment Settings", description: "Manage the dormitory’s GCash QR.", href: "/management/settings/payments", icon: "wallet" as const },
   { title: "Concerns & Suggestions", description: "Review resident feedback and respond.", href: "/management/concerns", icon: "sparkles" as const },
-  { title: "Analytics", description: "Review maintenance metrics and trends.", href: "/management/analytics", icon: "dashboard" as const },
   {
     title: "Maintenance",
     description: "Review and update maintenance requests.",
@@ -30,7 +31,7 @@ const links = [
 export default function ManagementMorePage() {
   return (
     <>
-      <PageHeader title="More workspace views" description="The everyday tools, kept easy to find." />
+      <PageHeader title="More workspace views" />
       <Panel
         title="Other sections"
         description="More tools for everyday operations."

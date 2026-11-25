@@ -1,3 +1,5 @@
+import { contractEndDate } from '@/app/lib/contract-dates.mjs';
+import { manilaToday } from '@/app/lib/room-context.mjs';
 import { recordAttachmentLinkFailure } from '@/app/lib/storage/link-failure';
 import { NextResponse, type NextRequest } from 'next/server';
 import { assertRequestOrigin } from '@/app/lib/backend/auth/dependencies';
@@ -32,17 +34,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (contract_attachment_id != null && (typeof contract_attachment_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(contract_attachment_id))) throw new BackendError('invalid_input');
-    if (contract_end_on != null && (typeof contract_end_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(contract_end_on))) throw new BackendError('invalid_input');
+    const startDate = decision === 'approved' ? (started_on ?? manilaToday()) : null;
+    const endDate = decision === 'approved' ? contractEndDate(startDate, contract_end_on) : null;
+    if (decision === 'approved' && !endDate) throw new BackendError('invalid_input');
     if (decision === 'rejected' && (typeof note !== 'string' || !note.trim())) throw new BackendError('invalid_input');
     const client = await createSupabaseServerClient();
     const { error, data } = await client.rpc('mapsilip_review_account_contract', {
       p_id: id,
       p_decision: decision,
       p_room_id: decision === 'approved' ? room_id : null,
-      p_started_on: decision === 'approved' ? (started_on || null) : null,
+      p_started_on: startDate,
       p_note: typeof note === 'string' ? note.trim() : null,
       p_contract_id: contract_attachment_id ?? null,
-      p_contract_end_on: contract_end_on ?? null,
+      p_contract_end_on: endDate,
     });
 
     if (error || data?.state !== decision) {

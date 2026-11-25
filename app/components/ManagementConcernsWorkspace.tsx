@@ -29,7 +29,7 @@ function formatDateTime(value: unknown) {
   });
 }
 
-export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenantId?: string }) {
+export function ManagementConcernsWorkspace({ initialTenantId, concernId }: { initialTenantId?: string; concernId?: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<Row | null>(null);
   const [search, setSearch] = useState('');
@@ -46,19 +46,26 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
   const [rooms, setRooms] = useState<Row[]>([]);
   const [assignments, setAssignments] = useState<Row[]>([]);
 
+  const openLinkedConcern = useRef(Boolean(concernId));
   const requests = useRef(createLatestRequest());
   const load = useCallback(async () => {
     const request = requests.current.start();
     setLoading(true);
     try {
       const query = new URLSearchParams({ resource: 'concerns', page: String(page), pageSize: '25', search, status });
+      if (concernId) query.set('recordId', concernId);
       if (initialTenantId) query.set('tenantId', initialTenantId);
       const result = await fetch(`/api/operations?${query}`, { signal: request.signal }).then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.message); return j; });
       if (!request.isCurrent()) return;
-      setCount(result.count); setRows(result.rows); setSelected(current => result.rows.find((r: Row) => r.id === current?.id) ?? null); setError('');
+      const openLinked = openLinkedConcern.current;
+      openLinkedConcern.current = false;
+      setCount(result.count);
+      setRows(result.rows);
+      setSelected(current => result.rows.find((row: Row) => row.id === (openLinked ? concernId : current?.id)) ?? null);
+      setError(openLinked && !result.rows.length ? 'This concern could not be opened.' : '');
     } catch { if (!request.isCurrent()) return; setRows([]); setError('Concern records could not be loaded.'); }
     finally { if (request.isCurrent()) setLoading(false); }
-  }, [initialTenantId, search, status, page]);
+  }, [initialTenantId, concernId, search, status, page]);
 
   useEffect(() => { const activeRequests = requests.current; const timer = window.setTimeout(() => void load(), 120); return () => { window.clearTimeout(timer); activeRequests.cancel(); }; }, [load]);
 
@@ -99,7 +106,8 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
   }
 
   return <div className="caretaker-workspace management-concerns">
-    <PageHeader title="Concerns & Suggestions" description="Review resident feedback and respond to submissions." />
+    <PageHeader title="Concerns & Suggestions" />
+    {concernId && <a href="/management/concerns">View all concerns</a>}
     <div className="caretaker-maintenance-layout concerns-maintenance-layout">
       <section className="panel caretaker-request-list concerns-request-list" aria-label="Concerns list">
         <div className="caretaker-room-tools concerns-tools">
@@ -111,7 +119,6 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
         </div>
         {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
         {loading && !rows.length ? <DataSkeleton label="Loading concerns" /> : rows.length ? <div className="caretaker-recent-list concerns-recent-list">{rows.map(row => {
-          const name = tenantName(row.tenant_id);
           const room = roomLabel(row.tenant_id);
           const rowStatus = label(row.status);
           return <button type="button" key={String(row.id)} className={`caretaker-request-row concerns-request-row${selected?.id === row.id ? ' is-selected' : ''}`} onClick={() => { setSelected(row); setResponding(false); }}>
@@ -119,10 +126,9 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
               <strong>{label(row.category) === '—' ? 'Concern' : label(row.category)}</strong>
               <span className={`concern-status-badge concern-status-badge--${rowStatus}`}>{rowStatus}</span>
             </span>
-            <span className="concern-row-description">{label(row.description)}</span>
             <span className="caretaker-request-row__bottom">
-              <span>{name}{room ? ` · ${room}` : ''}</span>
-              <time>{new Date(String(row.created_at)).toLocaleDateString()}</time>
+              <span>{room || 'Room not specified'}</span>
+              <time dateTime={String(row.created_at)}>{new Date(String(row.created_at)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>
             </span>
           </button>;
         })}</div> : !error && <EmptyState title="No concerns to display" description={search || status ? 'No concerns match these filters.' : 'Resident submissions will appear here.'} icon="sparkles" />}
@@ -130,7 +136,9 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
       </section>
 
       <MobileDetailSurface open={Boolean(selected)} onClose={() => setSelected(null)} title="Concern Details">
-        <Panel title="Concern Details" className="caretaker-request-details concerns-details-panel">
+        <Panel title="Concern Details" headerAction={selected && <button type="button" className="detail-header__close" aria-label="Clear selected concern" onClick={() => setSelected(null)}>
+                  <CloseIcon />
+                </button>} className="caretaker-request-details concerns-details-panel">
           {selected ? <div className="caretaker-selected-details concerns-details">
             <div className="concern-detail-header">
               <div className="concern-detail-identity">
@@ -155,9 +163,7 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
                 <span className={`concern-status-badge concern-status-badge--${label(selected.status)}`}>
                   {label(selected.status)}
                 </span>
-                <button type="button" className="caretaker-details-close" aria-label="Clear selected concern" onClick={() => setSelected(null)}>
-                  <CloseIcon />
-                </button>
+
               </div>
             </div>
 
@@ -206,6 +212,7 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
       open={responding && Boolean(selected)}
       onClose={() => setResponding(false)}
       title="Respond to concern"
+      className="request-response-overlay"
       description="Your response is shared with the resident."
       variant="dialog"
     >
@@ -225,8 +232,8 @@ export function ManagementConcernsWorkspace({ initialTenantId }: { initialTenant
           />
         </label>
         <div className="concerns-modal-actions">
-          <button className="button button--primary" disabled={busy}>{busy ? 'Saving…' : 'Save Response'}</button>
           <button type="button" className="button button--secondary" onClick={() => setResponding(false)}>Cancel</button>
+          <button type="submit" className="button button--primary" disabled={busy}>{busy ? 'Saving…' : 'Save Response'}</button>
         </div>
       </form>}
     </ResponsiveOverlay>

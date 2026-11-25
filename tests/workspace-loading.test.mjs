@@ -109,16 +109,15 @@ test('payment search loads records without requesting or waiting for dashboard m
  assert.equal(h.state[0][0].id,'payment');
 });
 
-test('owner dashboard displays available summary before slow recent records',async()=>{
- let finishRecent;
- const h=workspace('DashboardOverview','DashboardOverview',{role:'owner'},url=>{
-  if(url==='/api/dashboard')return Promise.resolve({ok:true,json:async()=>({pending_payments:7,income_by_currency:[]})});
-  if(url.includes('resource=rooms'))return Promise.resolve({ok:true,json:async()=>({rows:[],count:24})});
-  return new Promise(resolve=>{finishRecent=resolve});
+test('owner dashboard loads its summary without a redundant recent records request',async()=>{
+ const urls=[];
+ const h=workspace('DashboardOverview','DashboardOverview',{role:'owner'},async url=>{
+  urls.push(url);
+  return {ok:true,json:async()=>({pending_payments:7})};
  });
- h.render();const loading=h.callbacks[0]();
- await new Promise(resolve=>setImmediate(resolve));
- try {assert.equal(h.state[0]?.pending_payments,7);}finally{finishRecent({ok:true,json:async()=>({rows:[],count:0})});await loading;}
+ h.render(); await h.callbacks[0]();
+ assert.equal(h.state[0]?.pending_payments,7);
+ assert.deepEqual(urls,['/api/dashboard']);
 });
 
 test('payment summary refresh ignores older responses and unmounted requests',async()=>{

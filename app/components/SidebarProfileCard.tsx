@@ -59,7 +59,6 @@ export function SidebarProfileCard({ area }: { area: Area }) {
     aria-current={pathname === href ? 'page' : undefined}>
     {desktop ? <ProfilePhoto className="sidebar-profile-card__avatar" fallback={initials} />
       : <span className="sidebar-profile-card__avatar" aria-hidden="true">{initials}</span>}
-    <span className="sidebar-profile-card__greeting">Welcome Back!</span>
     <strong className="sidebar-profile-card__name">{name}</strong>
   </Link>;
 }

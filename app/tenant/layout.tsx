@@ -1,3 +1,4 @@
+import { TenantContractRenewal } from '../components/TenantContractRenewal';
 import { pushAvailable } from '../lib/backend/push/config';
 import { AppShell } from "../components/AppShell";
 import type { ReactNode } from "react";
@@ -10,5 +11,5 @@ export default async function TenantLayout(
 ) {
   if (!isTenantAuthEnabled()) redirect("/login");
   const { identity } = await requireTenantAccess();
-  return <AppShell pushEnabled={pushAvailable()} authenticatedUserId={identity.userId} area="tenant" tenantAuthEnabled>{children}</AppShell>;
+  return <AppShell pushEnabled={pushAvailable()} authenticatedUserId={identity.userId} area="tenant" tenantAuthEnabled><TenantContractRenewal reminder />{children}</AppShell>;
 }

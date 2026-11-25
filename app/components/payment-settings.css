@@ -1,0 +1,31 @@
+.preferences-payment-form {
+  min-width: 0;
+  margin: 0;
+}
+.payment-qr-upload {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.payment-qr-upload legend { margin-bottom: .5rem; }
+.preferences-payment-form .payment-qr-confirm {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: .625rem;
+  padding-block: .5rem;
+}
+.preferences-payment-form .payment-qr-confirm input {
+  width: 1.125rem;
+  height: 1.125rem;
+  min-height: 0;
+  margin: .125rem 0 0;
+  accent-color: var(--brand-deep);
+}
+.payment-qr-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+}

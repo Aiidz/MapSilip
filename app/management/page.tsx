@@ -1,6 +1,8 @@
+import { redirect } from 'next/navigation';
 import { DashboardOverview } from '../components/DashboardOverview';
 
 export default async function ManagementOverviewPage({ searchParams }: { searchParams: Promise<{ accessRequests?: string; export?: string }> }) {
   const { accessRequests, export: exportData } = await searchParams;
-  return <DashboardOverview role="owner" showAccessRequests={accessRequests === '1'} showExport={exportData === '1'} />;
+  if (exportData === '1') redirect('/management/storage');
+  return <DashboardOverview role="owner" showAccessRequests={accessRequests === '1'} />;
 }

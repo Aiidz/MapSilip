@@ -9,6 +9,7 @@ test('storage failure keeps the decision in memory without clearing unrelated da
 test('setup offers photo, installation, then notifications independently',()=>{
  const {setupStage}=load(); const base={photoDone:false,notificationDone:false,installDone:false,mobile:true,standalone:false,installEligible:true};
  assert.equal(setupStage(base),'profile');
+ assert.equal(setupStage({...base,photoDone:true,contactNeeded:true}),'contact');
  assert.equal(setupStage({...base,photoDone:true}),'invite');
  assert.equal(setupStage({...base,photoDone:true,installDone:true}),'notifications');
  assert.equal(setupStage({...base,photoDone:true,installDone:true,notificationDone:true}),null);
