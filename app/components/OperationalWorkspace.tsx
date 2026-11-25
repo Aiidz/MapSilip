@@ -90,6 +90,7 @@ export function OperationalWorkspace({ title, description, resources, role, init
   const [busy, setBusy] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<RecordRow | null>(null);
   const [tenantAction, setTenantAction] = useState<'move' | 'deactivate' | null>(null);
+  const [tenantView, setTenantView] = useState<'list' | 'grid'>('list');
   const [tenantActionMessage, setTenantActionMessage] = useState('');
   const tenantDialog = useRef<HTMLDialogElement>(null);
   const requestKey = useRef<string | null>(null);
@@ -286,11 +287,47 @@ export function OperationalWorkspace({ title, description, resources, role, init
       </form>}
       </ResponsiveOverlay>
       {loading && !rows.length ? <DataSkeleton /> : rows.length === 0 ? <EmptyState title={active === 'tenants' ? 'No tenants found' : 'No records'} description={active === 'tenants' ? 'Try another search or status filter.' : 'Records will appear here when available.'} icon="fileSearch" /> : active === 'tenants' ?
-        <div className="tenant-directory" aria-label="Tenant cards">{rows.map(row => <button type="button" className="tenant-directory__card" key={String(row.user_id)} onClick={() => openTenant(row)}>
-          <span className="tenant-directory__portrait" aria-hidden="true"><span>{String(row.display_name || '?').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span></span>
-          <span className="tenant-directory__meta"><strong>{String(row.display_name || 'Unnamed tenant')}</strong><small>{row.room_number ? `Room ${row.room_number}` : 'Needs a room'}</small></span>
-          {!row.room_id && <span className="tenant-directory__badge">Unassigned</span>}
-        </button>)}</div> :
+        <>
+          <div className="tenant-directory__toolbar">
+            <span className="tenant-directory__count">{count} {count === 1 ? 'tenant' : 'tenants'}</span>
+            <div className="tenant-directory__view-toggle" role="group" aria-label="Tenant view">
+              <button type="button" className={tenantView === 'grid' ? 'is-active' : ''} aria-pressed={tenantView === 'grid'} aria-label="Grid view" onClick={() => setTenantView('grid')}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              </button>
+              <button type="button" className={tenantView === 'list' ? 'is-active' : ''} aria-pressed={tenantView === 'list'} aria-label="List view" onClick={() => setTenantView('list')}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+              </button>
+            </div>
+          </div>
+          {tenantView === 'grid' ? (
+            <div className="tenant-directory tenant-directory--grid" aria-label="Tenant grid">{rows.map(row => {
+              const name = String(row.display_name || 'Unnamed tenant');
+              const initials = name.trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase() || '?';
+              const isActive = String(row.status || 'active').toLowerCase() === 'active';
+              return <button type="button" className="tenant-grid-card" key={String(row.user_id)} onClick={() => openTenant(row)}>
+                <div className="tenant-grid-card__top">
+                  <span className={`tenant-grid-card__status ${isActive ? 'is-active' : ''}`}>● {isActive ? 'Active' : String(row.status || 'Inactive')}</span>
+                </div>
+                <span className="tenant-grid-card__avatar" aria-hidden="true">
+                  {row.avatar_url ? <img src={String(row.avatar_url)} alt="" /> : <span>{initials}</span>}
+                </span>
+                <strong className="tenant-grid-card__name">{name}</strong>
+                <small className="tenant-grid-card__room">{row.room_number ? `Room ${row.room_number}` : 'Unassigned'}</small>
+                <div className="tenant-grid-card__info">
+                  <span>{row.email ? String(row.email) : 'No email'}</span>
+                  <span>{row.phone ? String(row.phone) : 'No contact'}</span>
+                </div>
+                <span className="tenant-grid-card__footer">View details ›</span>
+              </button>;
+            })}</div>
+          ) : (
+            <div className="tenant-directory" aria-label="Tenant cards">{rows.map(row => <button type="button" className="tenant-directory__card" key={String(row.user_id)} onClick={() => openTenant(row)}>
+              <span className="tenant-directory__portrait" aria-hidden="true"><span>{String(row.display_name || '?').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span></span>
+              <span className="tenant-directory__meta"><strong>{String(row.display_name || 'Unnamed tenant')}</strong><small>{row.room_number ? `Room ${row.room_number}` : 'Needs a room'}</small></span>
+              {!row.room_id && <span className="tenant-directory__badge">Unassigned</span>}
+            </button>)}</div>
+          )}
+        </> :
         <div className="operational-table-wrap"><table className="operational-table"><thead><tr>{columns[active].map(column => <th key={column}>{column.replaceAll('_',' ')}</th>)}<th>Actions</th></tr></thead><tbody>{rows.map((row,index) => <tr key={String(row.id ?? row.user_id ?? index)}>
           {columns[active].map(column => <td key={column}>{display(row[column],column,references)}</td>)}
           <td className="operational-row-actions">
