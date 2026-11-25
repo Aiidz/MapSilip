@@ -8620,4 +8620,5 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
   .auth-card--request .auth-brand-footer { position: static; margin-top: 0; font-size: 11px; }
 }
 
-.auth-page--refined .auth-form-side { background: rgba(248, 250, 252, 0.92); backdrop-filter: blur(18px); }
+.auth-page--refined .auth-form-side,
+.auth-page--login .auth-form-side { background: rgba(248, 250, 252, 0.92); backdrop-filter: blur(18px); }
