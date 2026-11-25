@@ -19,6 +19,7 @@ export function AuthPreview({ request = false, firstLogin = false, recovery = fa
     request && refineAuth ? "auth-page--request" : "",
     request && requestStage === "rooms" ? "auth-page--room-choice" : "",
   ].filter(Boolean).join(" ");
+
   return (
     <main className={pageClass}>
       <div className="auth-orb auth-orb--top" aria-hidden="true" />
@@ -26,20 +27,46 @@ export function AuthPreview({ request = false, firstLogin = false, recovery = fa
       <div className="auth-orb auth-orb--dark" aria-hidden="true" />
       <section className={`auth-card${request ? " auth-card--request" : ""}`}>
         <aside className="auth-brand-panel">
-          <Link className="auth-brand" href="/" aria-label="MapSilip home">
+          {/* Full-bleed dorm photo */}
+          <div className="auth-brand-photo" aria-hidden="true">
             <Image
-              className="auth-brand__logo"
-              src="/mapsilip-logo-combi.svg"
-              alt=""
-              width="1073"
-              height="419"
-              unoptimized
+              src="/dorm-bg.jpg"
+              alt="Mathea's Dormitory"
+              fill
+              sizes="(max-width:899px) 100vw, 50vw"
+              style={{ objectFit: "cover", objectPosition: "center 35%" }}
+              priority
             />
-          </Link>
-          <p className="auth-product-name">Dormitory Management System</p>
-          {(refineLogin
-            ? <p className="auth-greeting">Hello,<br /><strong>welcome!</strong></p>
-            : <h1>Hello,<br /><strong>welcome!</strong></h1>)}
+            <div className="auth-brand-photo__overlay" />
+          </div>
+
+          {/* Centered Real Mathea's Dormitory circular badge */}
+          <div className="auth-dorm-badge" aria-label="Mathea's Dormitory">
+            <Image
+              src="/matheas-real-logo.png"
+              alt="Mathea's Dormitory"
+              width={640}
+              height={640}
+              className="auth-dorm-badge__img"
+              priority
+            />
+          </div>
+
+          {/* Bottom: Powered by MapSilip footer */}
+          <div className="auth-brand-footer">
+            <span className="auth-powered-by">powered by</span>
+            <Link className="auth-brand" href="/" aria-label="MapSilip home">
+              <Image
+                className="auth-brand__logo"
+                src="/mapsilip-logo-real.svg"
+                alt="MapSilip"
+                width={1073}
+                height={419}
+                unoptimized
+              />
+            </Link>
+            <p className="auth-product-name">Dormitory Management System</p>
+          </div>
         </aside>
         <section className="auth-form-side" aria-labelledby={refineLogin ? "login-heading" : undefined}>
           <div className="auth-form-card">
