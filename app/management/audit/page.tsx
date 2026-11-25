@@ -57,23 +57,26 @@ export default async function AuditTrail({ searchParams }: {
 
   const rows = Array.isArray(data) ? data : [];
 
-  const [{ data: roomsData }, { data: tenantsData }, { data: assignmentsData }, { data: maintenanceData }, { data: paymentsData }, { data: invoicesData }] = rows.length
+  const [{ data: roomsData }, { data: tenantsData }, { data: assignmentsData }, { data: maintenanceData }, { data: paymentsData }, { data: invoicesData }, { data: concernsData }] = rows.length
     ? await Promise.all([
         client.from('rooms').select('id,room_number'),
         client.from('tenant_profiles').select('user_id,display_name'),
-        client.from('room_assignments').select('tenant_id,room_id').eq('status', 'active'),
+        client.from('room_assignments').select('id,tenant_id,room_id'),
         client.from('maintenance_requests').select('id,room_id'),
         client.from('rent_payments').select('id,tenant_id,invoice_id'),
         client.from('rent_invoices').select('id,room_id,tenant_id'),
+        client.from('concerns').select('id,tenant_id'),
       ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const roomById = new Map((roomsData ?? []).map(r => [r.id, r.room_number]));
   const tenantNameById = new Map((tenantsData ?? []).map(t => [t.user_id, t.display_name]));
   const tenantRoomById = new Map((assignmentsData ?? []).map(a => [a.tenant_id, roomById.get(a.room_id)]));
+  const assignmentRoomById = new Map((assignmentsData ?? []).map(a => [a.id, roomById.get(a.room_id)]));
   const maintenanceRoomById = new Map((maintenanceData ?? []).map(m => [m.id, roomById.get(m.room_id)]));
   const invoiceRoomById = new Map((invoicesData ?? []).map(inv => [inv.id, roomById.get(inv.room_id) ?? tenantRoomById.get(inv.tenant_id)]));
   const paymentRoomById = new Map((paymentsData ?? []).map(p => [p.id, invoiceRoomById.get(p.invoice_id) ?? tenantRoomById.get(p.tenant_id)]));
+  const concernRoomById = new Map((concernsData ?? []).map(c => [c.id, tenantRoomById.get(c.tenant_id)]));
 
   const resolveActor = (actorId: string | null) => {
     if (!actorId) return 'System';
@@ -83,9 +86,11 @@ export default async function AuditTrail({ searchParams }: {
   const resolveRoom = (recordId: string, actorId: string | null) => {
     const room =
       roomById.get(recordId) ??
+      assignmentRoomById.get(recordId) ??
       maintenanceRoomById.get(recordId) ??
       paymentRoomById.get(recordId) ??
       invoiceRoomById.get(recordId) ??
+      concernRoomById.get(recordId) ??
       (actorId ? tenantRoomById.get(actorId) : undefined);
     return room ? `Room ${room}` : '—';
   };
@@ -128,11 +133,24 @@ export default async function AuditTrail({ searchParams }: {
             </tr>)}</tbody>
           </table>
         </div>}
-      {!error && (page > 1 || (count ?? 0) > pageSize) && <nav className="operational-pagination" aria-label="Audit pages">
-        {page > 1 && <Link href={href(page - 1)}>Previous</Link>}
-        <span>Page {page}</span>
-        {page < 10000 && page * pageSize < (count ?? 0) && <Link href={href(page + 1)}>Next</Link>}
-      </nav>}
+      {!error && (count ?? 0) > 0 && (() => {
+        const totalPages = Math.max(1, Math.ceil((count ?? 0) / pageSize));
+        const hasPrev = page > 1;
+        const hasNext = page < 10000 && page < totalPages;
+        const prevIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>;
+        const nextIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>;
+        return <nav className="audit-pagination" aria-label="Audit pages">
+          {hasPrev
+            ? <Link className="audit-pagination-btn" href={href(page - 1)} aria-label="Previous page">{prevIcon}</Link>
+            : <span className="audit-pagination-btn is-disabled" aria-disabled="true">{prevIcon}</span>}
+          <span className="audit-pagination-label">Page</span>
+          <span className="audit-pagination-current">{page}</span>
+          <span className="audit-pagination-label">of {totalPages}</span>
+          {hasNext
+            ? <Link className="audit-pagination-btn" href={href(page + 1)} aria-label="Next page">{nextIcon}</Link>
+            : <span className="audit-pagination-btn is-disabled" aria-disabled="true">{nextIcon}</span>}
+        </nav>;
+      })()}
     </section>
   </div>;
 }
