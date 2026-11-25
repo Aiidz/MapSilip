@@ -4144,14 +4144,14 @@ button.room-context__person:hover, button.room-context__person:focus-visible { b
 .auth-page--refined.auth-page--request .auth-field input:focus,
 .auth-page--refined.auth-page--request .auth-field input:focus-visible {
   outline: 0;
-  border: 2px solid #b9363c;
+  border: 2px solid #30475e;
   box-shadow: none;
   animation: tenant-input-focus 420ms cubic-bezier(.16, 1, .3, 1);
 }
 .auth-page--login .auth-field input:focus,
 .auth-page--login .auth-field input:focus-visible {
   outline: 0;
-  border: 2px solid #b9363c;
+  border: 2px solid #30475e;
   box-shadow: none;
   animation: tenant-input-focus 420ms cubic-bezier(.16, 1, .3, 1);
 }
@@ -4160,7 +4160,7 @@ button.room-context__person:hover, button.room-context__person:focus-visible { b
 }
 @keyframes tenant-input-focus {
   from { border-color:#7b8088; }
-  to { border-color:#b9363c; }
+  to { border-color:#30475e; }
 }
 @media (prefers-reduced-motion: reduce) {
   .auth-page--refined.auth-page--request .auth-field input:focus,
@@ -8693,6 +8693,6 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
 .auth-page--login .auth-field input:focus,
 .auth-page--login .auth-field input:focus-visible {
   outline: 0;
-  border: 2px solid #b9363c;
+  border: 2px solid #30475e;
   box-shadow: none;
 }
