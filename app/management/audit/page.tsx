@@ -57,17 +57,23 @@ export default async function AuditTrail({ searchParams }: {
 
   const rows = Array.isArray(data) ? data : [];
 
-  const [{ data: roomsData }, { data: tenantsData }, { data: assignmentsData }] = rows.length
+  const [{ data: roomsData }, { data: tenantsData }, { data: assignmentsData }, { data: maintenanceData }, { data: paymentsData }, { data: invoicesData }] = rows.length
     ? await Promise.all([
         client.from('rooms').select('id,room_number'),
         client.from('tenant_profiles').select('user_id,display_name'),
         client.from('room_assignments').select('tenant_id,room_id').eq('status', 'active'),
+        client.from('maintenance_requests').select('id,room_id'),
+        client.from('rent_payments').select('id,tenant_id,invoice_id'),
+        client.from('rent_invoices').select('id,room_id,tenant_id'),
       ])
-    : [{ data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const roomById = new Map((roomsData ?? []).map(r => [r.id, r.room_number]));
   const tenantNameById = new Map((tenantsData ?? []).map(t => [t.user_id, t.display_name]));
   const tenantRoomById = new Map((assignmentsData ?? []).map(a => [a.tenant_id, roomById.get(a.room_id)]));
+  const maintenanceRoomById = new Map((maintenanceData ?? []).map(m => [m.id, roomById.get(m.room_id)]));
+  const invoiceRoomById = new Map((invoicesData ?? []).map(inv => [inv.id, roomById.get(inv.room_id) ?? tenantRoomById.get(inv.tenant_id)]));
+  const paymentRoomById = new Map((paymentsData ?? []).map(p => [p.id, invoiceRoomById.get(p.invoice_id) ?? tenantRoomById.get(p.tenant_id)]));
 
   const resolveActor = (actorId: string | null) => {
     if (!actorId) return 'System';
@@ -75,13 +81,13 @@ export default async function AuditTrail({ searchParams }: {
   };
 
   const resolveRoom = (recordId: string, actorId: string | null) => {
-    const directRoom = roomById.get(recordId);
-    if (directRoom) return `Room ${directRoom}`;
-    if (actorId) {
-      const actorRoom = tenantRoomById.get(actorId);
-      if (actorRoom) return `Room ${actorRoom}`;
-    }
-    return '—';
+    const room =
+      roomById.get(recordId) ??
+      maintenanceRoomById.get(recordId) ??
+      paymentRoomById.get(recordId) ??
+      invoiceRoomById.get(recordId) ??
+      (actorId ? tenantRoomById.get(actorId) : undefined);
+    return room ? `Room ${room}` : '—';
   };
 
   const href = (next: number) => '/management/audit?' + new URLSearchParams({ page: String(next), search, category, role });
