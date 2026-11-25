@@ -8609,3 +8609,7 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
   .tenant-directory--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .tenant-grid-card { padding: 12px 10px; }
 }
+
+.applicant-request-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.applicant-request-steps span { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.88); color: #30475e; font-size: 13px; font-weight: 600; }
+.applicant-request-steps span[aria-current="step"] { background: #f05454; color: #ffffff; }
