@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+import { notificationDestination } from "../lib/notification-destination";
 import { profilePathForArea } from "../lib/navigation.mjs";
 import { Icon } from "./Icon";
 import { ProfilePhoto } from "./ProfilePhoto";
@@ -27,7 +28,7 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
   const [open, setOpen] = useState<Popup>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
-  const [notificationRows, setNotificationRows] = useState<{ id: string; title: string; body: string; href: string; read_at: string | null }[]>([]);
+  const [notificationRows, setNotificationRows] = useState<{ id: string; title: string; body: string; href: string; event_key?: string | null; read_at: string | null }[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadLoaded, setUnreadLoaded] = useState(false);
   const unreadRequest = useRef(0);
@@ -148,17 +149,18 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
         <button className="toolbar-popover__close" type="button" aria-label="Close notifications" onClick={() => { setOpen(null); notificationsTrigger.current?.focus(); }}><CloseIcon /></button>
       </div>
       {authEnabled && !unreadLoaded && !notificationRows.length ? <DataSkeleton label="Loading notifications" count={2} /> : notificationRows.length ? <ul className="toolbar-notification-list">{notificationRows.map(item =>
-        <li key={item.id}><Link href={item.href} onClick={async event => {
+        <li key={item.id}><Link href={notificationDestination(item, area)} onClick={async event => {
           event.preventDefault();
+          setOpen(null);
           const response = await fetch('/api/operations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'notification.read', data: { id: item.id } }) });
           if (!response.ok) return;
           setNotificationRows(current => current.filter(row => row.id !== item.id));
           setUnreadCount(current => Math.max(0, current - 1));
           window.dispatchEvent(new Event('mapsilip-notifications-updated'));
-          router.push(item.href);
+          router.push(notificationDestination(item, area));
         }}><strong>{item.title}</strong><span>{item.body}</span><small>Unread</small></Link></li>)}</ul>
         : <div className="toolbar-popover__empty"><span className="toolbar-popover__empty-icon"><Icon name="bell" /></span><strong>No unread notifications</strong><p>You’re all caught up.</p></div>}
-      <Link className="toolbar-popover__link" href={area === "tenant" ? "/tenant/notifications" : area === "caretaker" ? "/caretaker/notifications" : "/management/notifications"}>Open notifications <Icon name="arrow" /></Link>
+      <Link className="toolbar-popover__link" href={area === "tenant" ? "/tenant/notifications" : area === "caretaker" ? "/caretaker/notifications" : "/management/notifications"} onClick={() => setOpen(null)}>Open notifications <Icon name="arrow" /></Link>
     </section>
   );
   const profilePanel = (
@@ -175,6 +177,9 @@ export function ToolbarPopovers({ area, compact = false, staffAuthEnabled = fals
       <Link role="menuitem" href={profileHref}><Icon name="users" /><span>Profile</span><Icon name="chevron" /></Link>
       {authEnabled && <Link role="menuitem" href={`/${area}/settings`} onClick={() => setOpen(null)}>
         <Icon name="settings" /><span>Settings</span><Icon name="chevron" /></Link>}
+      {authEnabled && area === "management" && <Link role="menuitem" href="/management/audit" onClick={() => setOpen(null)}>
+        <Icon name="fileSearch" /><span>Audit Trail</span><Icon name="chevron" />
+      </Link>}
       <button
         className={authEnabled ? undefined : "toolbar-profile-menu__disabled"}
         type="button"

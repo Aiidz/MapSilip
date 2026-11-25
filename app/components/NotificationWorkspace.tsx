@@ -1,5 +1,6 @@
 'use client';
 
+import { notificationDestination } from '../lib/notification-destination';
 import { NotificationRecordDetail } from './NotificationRecordDetail';
 import { DataSkeleton } from './DataSkeleton';
 
@@ -13,13 +14,6 @@ import { PageHeader } from './ui';
 
 type Notice = { id:string;title:string;body:string;href:string;event_key:string;read_at:string|null;created_at:string;actor_id?:string|null;actor_name?:string|null };
 type Area = 'management' | 'caretaker' | 'tenant';
-
-function notificationDestination(notice: Notice, area: Area) {
-  const concern = /^concern:([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}):/i.exec(notice.event_key);
-  return concern && (area === 'tenant' || area === 'management')
-    ? `/${area}/concerns?recordId=${encodeURIComponent(concern[1])}`
-    : notice.href;
-}
 
 type NoticeCategory = '' | 'payments' | 'maintenance' | 'concerns' | 'accounts' | 'visits' | 'contracts';
 

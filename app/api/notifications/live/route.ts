@@ -41,7 +41,8 @@ export async function GET(request: Request) {
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${identity.userId}` }, payload => {
           const row = payload.new;
           if (row.recipient_id !== identity.userId || typeof row.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(row.id) || row.read_at) return;
-          send(`data: ${JSON.stringify({ id: row.id, recipient_id: identity.userId })}\n\n`);
+          const maintenance = typeof row.event_key === 'string' && row.event_key.startsWith('maintenance:');
+          send(`data: ${JSON.stringify({ id: row.id, recipient_id: identity.userId, ...(maintenance && { kind: 'maintenance' }) })}\n\n`);
         }).subscribe(status => {
           if (status === 'SUBSCRIBED') send('event: ready\ndata: {}\n\n');
           else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) stop();

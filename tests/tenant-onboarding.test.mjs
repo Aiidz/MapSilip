@@ -45,7 +45,7 @@ test('account request UI matches reference design with password retention and vi
   // Placeholders matching reference design
   assert.match(form, /placeholder="First name"/);
   assert.match(form, /placeholder="Last name"/);
-  assert.match(form, /placeholder="09XX XXX XXXX"/);
+  assert.match(form, /placeholder="09123456789"/);
   assert.match(form, /placeholder="you@example.com"/);
   assert.match(form, /placeholder="Enter password"/);
   assert.match(form, /placeholder="Confirm password"/);

@@ -45,6 +45,8 @@ export function PwaManager({ userId, tenant, pushEnabled = false }: { userId: st
     dismissed.current = false;
     let photoChecked = Boolean(readDecision(`profile:${userId}`));
     let photoUnavailable = false;
+    let contactChecked = !tenant || Boolean(readDecision(`contact:${userId}`));
+    let contactNeeded = false;
     let installationConfirmed = false;
     const photoRequest = new AbortController();
     deferred.current = getInstallPrompt();
@@ -68,14 +70,26 @@ export function PwaManager({ userId, tenant, pushEnabled = false }: { userId: st
       notificationScope.current = `notifications:${userId}:${installed ? 'app' : 'browser'}`;
       installEligible.current = (eligible && isIos) || (!installed && until <= Date.now() && Boolean(deferred.current))
         || (!installed && currentStage.current === 'invite' && !readDecision(`install:${userId}`));
-      if (manualOpen.current || dismissed.current || !photoChecked) return;
-      const stage = setupStage({ contactNeeded: tenant && !readDecision(`contact:${userId}`), photoDone: photoUnavailable || Boolean(readDecision(`profile:${userId}`)), notificationDone: Boolean(readDecision(notificationScope.current)),
+      if (manualOpen.current || dismissed.current || !photoChecked || !contactChecked) return;
+      const stage = setupStage({ contactNeeded: tenant && contactNeeded && !readDecision(`contact:${userId}`), photoDone: photoUnavailable || Boolean(readDecision(`profile:${userId}`)), notificationDone: Boolean(readDecision(notificationScope.current)),
         installDone: Boolean(readDecision(`install:${userId}`)),
         standalone: installed, installEligible: installEligible.current });
       if (!stage) { dismissed.current = true; setOpen(false); }
       else { currentStage.current = stage; setMode(stage); setHasOpened(true); setOpen(true); }
     }
     advanceSetup.current = updateEligibility;
+    if (!contactChecked) {
+      void fetch('/api/profile', { credentials: 'same-origin', cache: 'no-store', signal: photoRequest.signal })
+        .then(async response => {
+          if (!response.ok) return;
+          const profile = await response.json();
+          if (!active) return;
+          contactNeeded = typeof profile.emergency_contact !== 'string' || !profile.emergency_contact.trim();
+          if (!contactNeeded) saveDecision(`contact:${userId}`, 'done');
+        })
+        .catch(() => { /* A profile load failure must not be treated as a missing contact. */ })
+        .finally(() => { if (active) { contactChecked = true; updateEligibility(); } });
+    }
     if (!photoChecked) {
       void fetch('/api/profile/photo', { credentials: 'same-origin', cache: 'no-store', signal: photoRequest.signal })
         .then(async response => {

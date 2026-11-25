@@ -43,23 +43,23 @@ test('denied desktop permission never enrolls or enables alerts',async()=>{
  assert.deepEqual(h.calls,[]);assert.equal(h.prefs.readForegroundEnabled(h.window.localStorage,'owner'),false);
 });
 
-async function feed({mobile=false,enabled=true}={}){
+async function feed({mobile=false,enabled=true,AudioContext}={}){
  const prefs=load(),values=new Map(),window=Object.assign(new EventTarget(),{localStorage:{getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)},open:(...args)=>opened.push(args)});
  const document=Object.assign(new EventTarget(),{visibilityState:'visible',hasFocus:()=>true});prefs.writeForegroundEnabled(window.localStorage,'owner',enabled);
  let inserted,cleanup;const shown=[],opened=[],filters=[],removed=[];
  class Notification{static permission='granted';constructor(title,options){this.title=title;this.options=options;shown.push(this)}close(){this.onclose?.()}}
  class EventSource { constructor(url){filters.push(url)} addEventListener(type,callback){if(type==='message')inserted=callback;else if(type==='ready')callback()} close(){removed.push(this)} }
- const exports={};vm.runInNewContext(ts.transpileModule(readFileSync('app/components/ForegroundNotifications.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports,Event,EventSource,window,document,Notification,navigator:{locks:{request:async(_key,callback)=>callback()}},require:n=>n==='react'?{useEffect:fn=>{cleanup=fn()}}:n.includes('/foreground')?prefs:{}});
+ const exports={};vm.runInNewContext(ts.transpileModule(readFileSync('app/components/ForegroundNotifications.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports,Event,CustomEvent,EventSource,window,document,Notification,AudioContext,navigator:{locks:{request:async(_key,callback)=>callback()}},require:n=>n==='react'?{useEffect:fn=>{cleanup=fn()}}:n.includes('/foreground')?prefs:{}});
  exports.ForegroundNotifications({userId:'owner',mobile});await new Promise(resolve=>setImmediate(resolve));
- const received=[];window.addEventListener('mapsilip-foreground-notification-received',()=>received.push(true));
+ const received=[];window.addEventListener('mapsilip-foreground-notification-received',event=>received.push(event.detail));
  return {shown,opened,filters,removed,received,window,document,emit:row=>inserted?.({data:JSON.stringify(row)}),cleanup};
 }
 const notice={id:'11111111-1111-4111-8111-111111111111',recipient_id:'owner',body:'PRIVATE TENANT DETAILS',href:'https://attacker.invalid'};
 test('desktop live insert uses generic standard Notification, deduplicates, and routes through authenticated resolver',async()=>{
  const h=await feed();try{
   assert.equal(h.shown.length,0,'never replay old notices on connection');assert.equal(h.filters[0],'/api/notifications/live');
-  h.emit({...notice,recipient_id:'other'});h.emit(notice);h.emit(notice);await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(h.received.length,1);
+  h.emit({...notice,recipient_id:'other'});h.emit({...notice,kind:'maintenance'});h.emit(notice);await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(h.received,['maintenance']);
   assert.equal(h.shown.length,1);assert.equal(h.shown[0].title,'MapSilip');assert.equal(h.shown[0].options.body,'You have a new update.');
   h.shown[0].onclick();assert.equal(h.opened[0][0],'/notifications/open?id='+notice.id);assert.equal(h.opened[0][2],'noopener');
  }finally{h.cleanup()}
@@ -82,4 +82,29 @@ test('desktop alerts stay off without explicit opt-in',async()=>{
 test('desktop browser alerts still enable when the browser push service is unavailable',async()=>{
  const h=desktopSettings({brokenPush:true});h.button(h.render()).props.onClick();await new Promise(resolve=>setImmediate(resolve));
  assert.equal(h.prefs.readForegroundEnabled(h.window.localStorage,'owner'),true);assert.deepEqual(h.calls,['permission']);
+});
+
+test('a visible live notification chimes after interaction and duplicate events stay quiet', async () => {
+ let plays = 0;
+ class AudioContext {
+  state = 'running';
+  currentTime = 1;
+  createOscillator() {
+   return { frequency: { setValueAtTime() {} }, connect() {}, start() { plays++; }, stop() {} };
+  }
+  createGain() {
+   return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} };
+  }
+  async close() {}
+ }
+ const h = await feed({ mobile: true, enabled: false, AudioContext });
+ try {
+  h.emit(notice);
+  assert.equal(plays, 0);
+  h.document.dispatchEvent(new Event('click'));
+  const next = { ...notice, id: '22222222-2222-4222-8222-222222222222' };
+  h.emit(next);
+  h.emit(next);
+  assert.equal(plays, 1);
+ } finally { h.cleanup(); }
 });

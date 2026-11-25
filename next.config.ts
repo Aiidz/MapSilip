@@ -1,4 +1,8 @@
 import type { NextConfig } from 'next';
+import { PHASE_PRODUCTION_BUILD } from 'next/constants';
+import { existsSync } from 'node:fs';
+
+const supabaseRootCertificate = './.certs/supabase-root.crt';
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -13,8 +17,13 @@ const nextConfig: NextConfig = {
     ] }];
   },
   outputFileTracingIncludes: {
-    '/*': ['./.certs/supabase-root.crt'],
+    '/*': [supabaseRootCertificate],
   },
 };
 
-export default nextConfig;
+export default function config(phase: string): NextConfig {
+  if (phase === PHASE_PRODUCTION_BUILD && !existsSync(supabaseRootCertificate)) {
+    throw new Error('The production build requires .certs/supabase-root.crt for Supabase authentication. Include the public certificate in the deployment source.');
+  }
+  return nextConfig;
+}

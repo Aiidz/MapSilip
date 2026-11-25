@@ -106,6 +106,7 @@ export function TenantFileDropzone({
   name,
   accept,
   required = false,
+  disabled = false,
   title = 'Choose file',
   subtitle = 'Images optimized automatically · PDF up to 2 MB',
   onChange,
@@ -113,6 +114,7 @@ export function TenantFileDropzone({
   name: string;
   accept: string;
   required?: boolean;
+  disabled?: boolean;
   title?: string;
   subtitle?: string;
   onChange?: (file: File | null) => void;
@@ -136,7 +138,7 @@ export function TenantFileDropzone({
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragOver(true);
+    if (!disabled) setIsDragOver(true);
   };
 
   const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
@@ -148,7 +150,7 @@ export function TenantFileDropzone({
     e.preventDefault();
     setIsDragOver(false);
     const file = e.dataTransfer.files?.[0] ?? null;
-    if (file && inputRef.current) {
+    if (!disabled && file && inputRef.current) {
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(file);
       inputRef.current.files = dataTransfer.files;
@@ -173,6 +175,7 @@ export function TenantFileDropzone({
         name={name}
         accept={accept}
         required={required && !selectedFile}
+        disabled={disabled}
         className="tenant-file-input--hidden"
         onChange={onInputChange}
       />
@@ -201,6 +204,7 @@ export function TenantFileDropzone({
             type="button"
             className="tenant-file-remove-button"
             onClick={handleRemove}
+            disabled={disabled}
             aria-label={`Remove ${selectedFile.name}`}
           >
             Remove
@@ -209,14 +213,15 @@ export function TenantFileDropzone({
       ) : (
         <div
           className={`tenant-dropzone${isDragOver ? ' is-dragover' : ''}`}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => { if (!disabled) inputRef.current?.click(); }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           role="button"
-          tabIndex={0}
+          aria-disabled={disabled}
+          tabIndex={disabled ? -1 : 0}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
               e.preventDefault();
               inputRef.current?.click();
             }

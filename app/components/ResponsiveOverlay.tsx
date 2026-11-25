@@ -68,6 +68,7 @@ export function ResponsiveOverlay({
   const titleId = useId();
   const descriptionId = useId();
   const drag = useRef<{ id: number; startY: number; startedAt: number; distance: number } | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   function startDrag(event: PointerEvent<HTMLElement>) {
     if (!dismissible || !open || event.button !== 0 || !event.isPrimary || !window.matchMedia('(max-width: 767px)').matches ||
@@ -115,6 +116,77 @@ export function ResponsiveOverlay({
     onCloseRef.current();
     finishReplacement();
   }, [dismissible, finishReplacement]);
+
+  // Body swipe-down-to-dismiss via native (non-passive) touch events.
+  // Pointer events on the body don't work because touch-action:pan-y makes
+  // the browser claim the gesture before pointer capture can fire.
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !dismissible) return;
+
+    let startY = 0;
+    let startTime = 0;
+    let dy = 0;
+    let dragging = false;
+
+    function onTouchStart(e: TouchEvent) {
+      if (!open || !window.matchMedia('(max-width: 767px)').matches) return;
+      if (body!.scrollTop > 0) return;
+      const t = e.touches[0];
+      if (!t) return;
+      startY = t.clientY;
+      startTime = e.timeStamp;
+      dy = 0;
+      dragging = false;
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (!open) return;
+      const t = e.touches[0];
+      if (!t) return;
+      // If body has scrolled down, cancel any drag intention.
+      if (body!.scrollTop > 0) { dragging = false; return; }
+      dy = t.clientY - startY;
+      if (dy <= 0) { dragging = false; return; }
+      // Once we're sure it's a downward pull, take over from the scroll.
+      if (!dragging && dy > 5) {
+        dragging = true;
+        dialogRef.current?.classList.remove('ps-overlay--drag-return');
+        dialogRef.current?.classList.add('ps-overlay--dragging');
+      }
+      if (dragging) {
+        e.preventDefault();
+        dialogRef.current?.style.setProperty('--sheet-drag-y', `${dy}px`);
+      }
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      if (!dragging) return;
+      dragging = false;
+      const dialog = dialogRef.current;
+      const speed = dy / Math.max(1, e.timeStamp - startTime);
+      const threshold = Math.min(140, Math.max(80, (dialog?.offsetHeight ?? 400) * 0.22));
+      const dismiss = e.type !== 'touchcancel' && (dy > threshold || (dy > 30 && speed > 0.6));
+      dialog?.classList.remove('ps-overlay--dragging');
+      if (dismiss) {
+        requestClose();
+      } else {
+        dialog?.classList.add('ps-overlay--drag-return');
+        dialog?.style.setProperty('--sheet-drag-y', '0px');
+      }
+    }
+
+    body.addEventListener('touchstart', onTouchStart, { passive: true });
+    body.addEventListener('touchmove', onTouchMove, { passive: false });
+    body.addEventListener('touchend', onTouchEnd, { passive: true });
+    body.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    return () => {
+      body.removeEventListener('touchstart', onTouchStart);
+      body.removeEventListener('touchmove', onTouchMove);
+      body.removeEventListener('touchend', onTouchEnd);
+      body.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [open, dismissible, requestClose]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -231,7 +303,7 @@ export function ResponsiveOverlay({
           <CloseIcon />
         </button>
       </header>
-      <div className="ps-overlay__body">{children}</div>
+      <div className="ps-overlay__body" ref={bodyRef}>{children}</div>
     </dialog>
   ), document.body);
 }

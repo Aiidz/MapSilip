@@ -15,7 +15,7 @@ const resources: Record<string, ResourceSpec> = {
   tenants: { table: 'tenant_profiles', columns: 'gender,user_id,display_name,phone,emergency_contact,status,created_at', order: 'created_at', search: 'display_name', statuses: ['active','inactive'] },
   accountRequests: { table: 'account_requests', columns: 'id,email,display_name,phone,gender,preferred_room_id,status,created_at,reviewed_at', order: 'created_at', search: 'email', statuses: ['pending','approved','rejected','activated'] },
   invoices: { table: 'invoices', columns: 'id,tenant_id,room_id,coverage_start,coverage_end,due_on,amount,currency,note,created_at', order: 'created_at', search: '', statuses: [] },
-  payments: { table: 'payments', columns: 'id,invoice_id,tenant_id,amount,method,cash_recipient,reference_number,attachment_id,status,review_note,created_at,reviewed_at', order: 'created_at', search: 'reference_number', statuses: ['pending','approved','rejected'] },
+  payments: { table: 'payments', columns: 'id,invoice_id,tenant_id,amount,method,cash_recipient,batch_total,reference_number,attachment_id,status,review_note,created_at,reviewed_at', order: 'created_at', search: 'reference_number', statuses: ['pending','approved','rejected'] },
   maintenance: { table: 'maintenance_requests', columns: 'id,tenant_id,room_id,category,description,attachment_id,status,staff_response,created_at,updated_at', order: 'created_at', search: 'description', statuses: ['pending','in_progress','resolved'] },
   concerns: { table: 'concerns', columns: 'id,tenant_id,category,description,status,owner_response,created_at,updated_at', order: 'created_at', search: 'description', statuses: ['pending','resolved'] },
   visits: { table: 'planned_visits', columns: 'id,tenant_id,visitor_name,visit_on,arrival_time,departure_time,purpose,cancelled_at,created_at', order: 'visit_on', search: 'visitor_name', statuses: [] },
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
 
 const allowedActions = new Set([
   'notification.read','notification.unread','profile.update','attachment.begin','room.create','room.update','room.assign',
-  'invoice.create','payment.submit','payment.review','maintenance.create','maintenance.update','maintenance.rate',
+  'invoice.create','payment.submit','payment.submit_periods','payment.review','maintenance.create','maintenance.update','maintenance.rate',
   'concern.create','concern.respond','visit.create','visit.cancel',
 ]);
 
@@ -169,6 +169,8 @@ export async function POST(request: NextRequest) {
     await verifyAuthSession(client.auth);
     const { data, error } = body.action === 'notification.unread'
       ? await client.rpc('mapsilip_mark_notification_unread', { p_id: body.data.id })
+      : body.action === 'payment.submit_periods'
+      ? await client.rpc('mapsilip_submit_rent_periods', { p_data: body.data })
       : body.action === 'maintenance.rate'
       ? await client.rpc('mapsilip_rate_maintenance', { p_id: body.data.id, p_rating: body.data.rating, p_comment: body.data.comment })
       : body.action === 'visit.create'

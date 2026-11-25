@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Icon } from './Icon';
 
 type TransitionDocument = Document & {
@@ -9,6 +9,16 @@ type TransitionDocument = Document & {
 
 export function ThemeToggle() {
   const sequence = useRef(0);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'mapsilip-theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
+        document.documentElement.dataset.theme = e.newValue;
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   function toggleTheme() {
     const root = document.documentElement;
@@ -23,7 +33,11 @@ export function ThemeToggle() {
         ? root.dataset.theme === 'dark'
         : window.matchMedia('(prefers-color-scheme: dark)').matches;
       const next = !current;
-      root.dataset.theme = next ? 'dark' : 'light';
+      const nextTheme = next ? 'dark' : 'light';
+      root.dataset.theme = nextTheme;
+      try {
+        localStorage.setItem('mapsilip-theme', nextTheme);
+      } catch {}
     };
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const transitionDocument = document as TransitionDocument;

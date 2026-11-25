@@ -24,14 +24,19 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f6f7f9",
+  themeColor: "#171c22",
 };
+
+const themeInitScript = `(function(){try{var s=localStorage.getItem('mapsilip-theme');var t=(s==='light'||s==='dark')?s:'dark';document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export default function RootLayout(
   { children }: Readonly<{ children: ReactNode }>,
 ) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className={montserrat.variable}><InstallPromptCapture />{children}</body>
     </html>
   );

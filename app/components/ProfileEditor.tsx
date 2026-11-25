@@ -1,5 +1,6 @@
 'use client';
 
+import { PhoneInput } from './PhoneInput';
 import { EmergencyContactFields } from './EmergencyContactFields';
 import { emergencyContactLimit, formatEmergencyContact, parseEmergencyContact } from '../lib/emergency-contact';
 
@@ -59,7 +60,7 @@ export function ProfileEditor({ role = 'owner', embedded = false }: { role?: 'ow
           <label>First Name<input required maxLength={80} autoComplete="given-name" readOnly={!editing} value={names.first} onChange={event => setNames({ ...names, first: event.target.value })} /></label>
           <label>Email Address<input readOnly type="email" value={profile.email} /></label>
           <label>Middle Name<input maxLength={80} autoComplete="additional-name" readOnly={!editing} value={names.middle} onChange={event => setNames({ ...names, middle: event.target.value })} /></label>
-          <label>Contact Number<input maxLength={30} autoComplete="tel" readOnly={!editing} value={draftPhone} onChange={event => setDraftPhone(event.target.value)} /></label>
+          <label>Contact Number<PhoneInput maxLength={30} readOnly={!editing} value={draftPhone} onChange={event => setDraftPhone(event.target.value)} /></label>
           <label>Last Name<input maxLength={80} autoComplete="family-name" readOnly={!editing} value={names.last} onChange={event => setNames({ ...names, last: event.target.value })} /></label>
           <EmergencyContactFields id="emergency-contact" contact={draftEmergencyContact}
             onChange={setDraftEmergencyContact} readOnly={!editing} tooLong={contactTooLong} />
@@ -87,7 +88,7 @@ export function ProfileEditor({ role = 'owner', embedded = false }: { role?: 'ow
           <label>Full name<input required maxLength={80} autoComplete="name" value={profile.display_name}
             onChange={event => setProfile({ ...profile, display_name: event.target.value })} /></label>
           <label>Email address<input readOnly type="email" value={profile.email} /></label>
-          <label>Contact number<input maxLength={30} autoComplete="tel" value={profile.phone}
+          <label>Contact number<PhoneInput maxLength={30} value={profile.phone}
             onChange={event => setProfile({ ...profile, phone: event.target.value })} /></label>
           <button className="button button--primary" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button>
         </form><p role="status">{message}</p>

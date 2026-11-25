@@ -39,11 +39,14 @@ export async function POST(request: Request) {
     let png: Buffer;
     try {
       const file = (await readUploadForm(request)).get('file');
-      if (!(file instanceof File) || file.type !== 'image/png') throw new Error();
+      if (!(file instanceof File) || !['image/png', 'image/jpeg'].includes(file.type) || file.size > 2_000_000) throw new Error();
       const image = sharp(await file.arrayBuffer(), { limitInputPixels: 4_000_000, failOn: 'warning' });
       const metadata = await image.metadata();
-      if (metadata.format !== 'png' || (metadata.pages ?? 1) !== 1) throw new Error();
-      png = await image.rotate().png().toBuffer();
+      if (file.type !== `image/${metadata.format}` || (metadata.pages ?? 1) !== 1) throw new Error();
+      png = await image.clone().rotate().png({ compressionLevel: 9 }).toBuffer();
+      if (file.type === 'image/jpeg' && png.length > 262500) {
+        png = await image.rotate().png({ palette: true, colours: 32, dither: 0 }).toBuffer();
+      }
       const decode = async (width?: number) => {
         const source = sharp(png).flatten({ background: '#fff' }).ensureAlpha();
         if (width) source.resize({ width });

@@ -10,6 +10,7 @@ import { DataSkeleton } from './DataSkeleton';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createLatestRequest, fetchOperationRows } from '../lib/workspace-loading';
 import { Icon } from './Icon';
+import { FilterDropdown } from './FilterDropdown';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
 import { MobileDetailSurface } from './MobileDetailSurface';
 import { PageHeader } from './ui';
@@ -17,9 +18,6 @@ import { PageHeader } from './ui';
 type Row = Record<string,unknown>;
 const show = (value: unknown) => value == null || value === '' ? '—' : String(value);
 
-function PaymentDropdown({ label, icon, value, options, onChange }: { label: string; icon: 'calendar' | 'filter'; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
-  return <details className="payment-dropdown"><summary aria-label={label}><Icon name={icon} /><span>{options.find(option => option.value === value)?.label}</span><Icon name="chevron" /></summary><div className="payment-dropdown__menu">{options.map(option => <button type="button" key={option.value} aria-pressed={value === option.value} onClick={event => { onChange(option.value); event.currentTarget.closest('details')?.removeAttribute('open'); }}><Icon name={icon} /><span>{option.label}</span>{value === option.value && <span aria-hidden="true">✓</span>}</button>)}</div></details>;
-}
 const initials = (name: string) => name.split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase();
 const statusLabel = (status: unknown) => status === 'pending' ? 'For Review' : status === 'approved' ? 'Verified' : 'Rejected';
 export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSearch?: string }) {
@@ -155,13 +153,13 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
       ['For Verification',summary ? show(summary.pending_payments) : '—','Submissions awaiting review'],
       ['Overdue Accounts',summary ? show(overview?.overdue || 0) : '—','Invoices past due'],
     ].map(([title,value,description],index) => <article className={`payment-summary__card${index === 0 ? ' payment-summary__card--highlight' : ''}`} key={title}>
-      <span>{title}</span><strong>{value}</strong><small>{description}</small><span className="payment-summary__mark" aria-hidden="true"><Icon name="arrow" /></span>
+      <span>{title}</span><strong>{value}</strong><small>{description}</small>
     </article>)}</section>
     {message && <p role="status">{message} <button type="button" onClick={() => void Promise.all([load(), loadSummary()])}>Refresh</button></p>}
     <div className={`payment-board${selected ? ' payment-board--details-open' : ''}`}><div className="payment-list-column"><div className="payment-filters" aria-label="Payment record filters">
       <label className="payment-filter payment-filter--search"><Icon name="search" /><input aria-label="Search payment reference or tenant name" placeholder="Search reference or tenant name..." value={search} onChange={event => { setSearch(event.target.value);setPage(1); }} /></label>
-      <PaymentDropdown label="Submission month" icon="calendar" value={month} onChange={value => { setMonth(value); setPage(1); }} options={[{ value:'',label:'All Months' }, ...Array.from({ length:12 },(_,index) => { const date = new Date(`${currentMonth}-01T00:00:00Z`); date.setUTCMonth(date.getUTCMonth()-index); return { value:date.toISOString().slice(0,7),label:date.toLocaleString(undefined,{ month:'long',year:'numeric',timeZone:'UTC' }) }; })]} />
-      <PaymentDropdown label="Payment status" icon="filter" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value:'',label:'All Statuses' },{ value:'pending',label:'For Review' },{ value:'approved',label:'Verified' },{ value:'rejected',label:'Rejected' }]} />
+      <FilterDropdown label="Submission month" icon="calendar" value={month} onChange={value => { setMonth(value); setPage(1); }} options={[{ value:'',label:'All Months' }, ...Array.from({ length:12 },(_,index) => { const date = new Date(`${currentMonth}-01T00:00:00Z`); date.setUTCMonth(date.getUTCMonth()-index); return { value:date.toISOString().slice(0,7),label:date.toLocaleString(undefined,{ month:'long',year:'numeric',timeZone:'UTC' }) }; })]} />
+      <FilterDropdown label="Payment status" icon="filter" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value:'',label:'All Statuses' },{ value:'pending',label:'For Review' },{ value:'approved',label:'Verified' },{ value:'rejected',label:'Rejected' }]} />
     </div>
       <section className="payment-table-panel" aria-label="Payment submissions"><div className="payment-table-scroll"><table className="payment-table"><thead><tr><th scope="col">Tenant / Room</th><th scope="col">Amount</th><th scope="col">Submitted</th><th scope="col">Status</th></tr></thead>
         <tbody>{loading && !rows.length ? <tr><td colSpan={4}><DataSkeleton label="Loading payment records" variant="table" /></td></tr> : rows.length ? rows.map(row => <tr key={String(row.id)} onClick={() => { setSelected(row);setCreating(false); }} className={selected?.id === row.id ? 'is-selected' : ''}>
@@ -177,6 +175,8 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
         <div className="payment-detail-identity"><ProfilePhoto key={String(selected.tenant_id)} className="payment-tenant-avatar" userId={String(selected.tenant_id)} fallback={initials(tenantName(selected.tenant_id))} /><div><strong>{tenantName(selected.tenant_id)}</strong><small>Room {roomName(selected.tenant_id)}</small></div><span className={`payment-status payment-status--${selected.status}`}>{statusLabel(selected.status)}</span></div>
         <h3>Payment Information</h3><dl className="payment-information">
           <div><dt>Amount</dt><dd>{show(selected.amount)} {invoiceCurrency(selected.invoice_id)}</dd></div>
+          {selected.batch_total != null && Number(selected.batch_total) !== Number(selected.amount) &&
+            <div><dt>Total covered by this proof</dt><dd>{show(selected.batch_total)} {invoiceCurrency(selected.invoice_id)}</dd></div>}
           <div><dt>Billing Period</dt><dd>{invoices.find(invoice => invoice.id === selected.invoice_id)?.coverage_start ? new Date(String(invoices.find(invoice => invoice.id === selected.invoice_id)?.coverage_start)).toLocaleDateString(undefined,{ month:'long',year:'numeric' }) : '—'}</dd></div>
           <div><dt>Payment Method</dt><dd>{show(selected.method)}</dd></div>
           <div><dt>Reference Number</dt><dd>{show(selected.reference_number)}</dd></div>
@@ -185,7 +185,9 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
         {selected.attachment_id ? <PaymentProofViewer key={String(selected.attachment_id)} attachmentId={String(selected.attachment_id)} /> : <p className="tenant-payment-proof">{selected.method === 'cash' ? 'Cash payment — verify receipt before approval.' : 'No payment proof attached.'}</p>}
         {selected.status === 'pending' ? <form className="operational-form payment-detail-form" onSubmit={review}>
           {selected.method === 'cash' && <><p>Cash reported as handed to: {show(selected.cash_recipient)}. Confirm only when the admin has received the money.</p><label><input type="checkbox" name="cash_received" /> I confirm the admin received this cash payment.</label></>}
-          {selected.method === 'gcash' && <label><input type="checkbox" name="gcash_received" /> I verified the reference and full invoice amount in the GCash merchant account.</label>}
+          {selected.method === 'gcash' && <label><input type="checkbox" name="gcash_received" /> I verified the reference and total payment amount in the GCash merchant account.</label>}
+          {selected.batch_total != null && Number(selected.batch_total) !== Number(selected.amount) &&
+            <p>Your decision applies to all months covered by this proof.</p>}
           <label>Reason if rejected<textarea name="note" rows={3} maxLength={500} /></label>
           <div className="payment-review-actions"><button className="button payment-review-reject" name="status" value="rejected" disabled={busy}>Reject</button><button className="button payment-review-confirm" name="status" value="approved" disabled={busy}>Confirm Payment</button></div>
         </form> : <div className={`payment-review-result payment-review-result--${selected.status}`}><strong>{selected.status === 'approved' ? '✓ Payment Verified' : 'ⓘ Payment Rejected'}</strong><p>{selected.status === 'approved' ? 'This payment has been confirmed by the admin.' : 'Please contact the admin regarding your payment submission.'}</p>{Boolean(selected.review_note) && <p>{show(selected.review_note)}</p>}</div>}

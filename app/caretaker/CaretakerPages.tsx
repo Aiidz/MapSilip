@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneInput } from '../components/PhoneInput';
 import { CloseIcon } from "../components/CloseIcon";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -39,7 +40,6 @@ export function CaretakerDashboard() {
     <section className="caretaker-summary" aria-label="Maintenance request summary">
       {requestSummary.map((label) => <article className="caretaker-summary__card" key={label}>
         <div><h2>{label}</h2><span aria-label="Unavailable">—</span><p>No data available</p></div>
-        <span className="caretaker-summary__icon" aria-hidden="true"><Icon name="arrow" /></span>
       </article>)}
     </section>
     <Panel title="Recent Maintenance Requests" className="caretaker-panel" >
@@ -203,7 +203,7 @@ export function CaretakerMaintenance({ initialRoomId }: { initialRoomId?: string
       action={<button className="dashboard-export room-management__export" type="button" disabled><Icon name="download" />Export Report</button>} />
     <section className="caretaker-summary caretaker-list-summary" aria-label="Maintenance request summary">
       {([['Total Requests',count,'Recorded repairs'],['Pending',statusCounts?.pending,'Awaiting action'],['In Progress',statusCounts?.in_progress,'Being handled'],['Urgent Requests',null,'Priority not tracked']] as const).map(([label,value,description]) => <article className="caretaker-summary__card" key={label}>
-        <div><h2>{label}</h2><span>{value ?? '—'}</span><p>{description}</p></div><span className="caretaker-summary__icon" aria-hidden="true"><Icon name="arrow" /></span>
+        <div><h2>{label}</h2><span>{value ?? '—'}</span><p>{description}</p></div>
       </article>)}
     </section>
     <div className="room-tabs caretaker-view-tabs" role="group" aria-label="Maintenance view">
@@ -228,17 +228,15 @@ export function CaretakerMaintenance({ initialRoomId }: { initialRoomId?: string
         </div>
         {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
         {visibleRows.length ? <div className="caretaker-recent-list concerns-recent-list">{visibleRows.map(row => {
-          const rowStatus = String(row.status);
-          const name = tenantName(row.tenant_id, row.room_id);
           const room = roomLabel(row.room_id);
+          const rowStatus = String(row.status);
           return <button className={`caretaker-request-row concerns-request-row${selected?.id === row.id ? ' is-selected' : ''}`} type="button" key={String(row.id)} onClick={() => {setSelected(row);setResponding(false);}}>
             <span className="caretaker-request-row__top">
               <strong>{String(row.category)}</strong>
               <span className={`concern-status-badge concern-status-badge--${rowStatus}`}>{rowStatus.replaceAll('_', ' ')}</span>
             </span>
-            <span className="concern-row-description">{String(row.description)}</span>
             <span className="caretaker-request-row__bottom">
-              <span>{name}{room ? ` · ${room}` : ''}</span>
+              <span>{room || 'Room not specified'}</span>
               <time dateTime={String(row.created_at)}>{new Date(String(row.created_at)).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</time>
             </span>
           </button>;
@@ -336,6 +334,7 @@ export function CaretakerMaintenance({ initialRoomId }: { initialRoomId?: string
       dismissible={!busy}
       onClose={() => setResponding(false)}
       title="Update maintenance request"
+      className="request-response-overlay"
       description={selected ? `${String(selected.category)} · ${roomNumbers.get(String(selected.room_id)) ? `Room ${roomNumbers.get(String(selected.room_id))}` : 'Room —'}` : undefined}
       variant="dialog"
     >
@@ -363,8 +362,8 @@ export function CaretakerMaintenance({ initialRoomId }: { initialRoomId?: string
           </label>
           {saveError && <p role="alert">{saveError}</p>}
           <div className="concerns-modal-actions">
-            <button type="submit" className="button button--primary" disabled={busy || !canUpdate}>{busy ? 'Saving…' : 'Save Changes'}</button>
             <button type="button" className="button button--secondary" disabled={busy} onClick={() => setResponding(false)}>Cancel</button>
+            <button type="submit" className="button button--primary" disabled={busy || !canUpdate}>{busy ? 'Saving…' : 'Save Changes'}</button>
           </div>
         </form>
       )}
@@ -413,7 +412,7 @@ export function CaretakerNotifications() {
 }
 
 function ProfileField({ label, type = "text", disabled = false }: { label: string; type?: string; disabled?: boolean }) {
-  return <label className="caretaker-profile-field"><span>{label}</span><input type={type} placeholder="Not provided" disabled={disabled} autoComplete="off" /></label>;
+  return <label className="caretaker-profile-field"><span>{label}</span>{type === "tel" ? <PhoneInput placeholder="Not provided" disabled={disabled} /> : <input type={type} placeholder="Not provided" disabled={disabled} autoComplete="off" />}</label>;
 }
 
 export function CaretakerProfile() {

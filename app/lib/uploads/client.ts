@@ -14,12 +14,15 @@ export async function prepareUpload(file: File, purpose: UploadPurpose): Promise
     if (file.size > MAX_UPLOAD_BYTES) throw new Error('PDFs must be under 2 MB. Export a smaller PDF and try again.');
     return file;
   }
-  if (!IMAGE_TYPES.includes(file.type)) throw new Error('Choose a JPEG or PNG image. Convert HEIC photos to JPEG first.');
+  const isIphonePhoto = purpose === 'maintenance' &&
+    (['image/heic', 'image/heif'].includes(file.type.toLowerCase()) ||
+      (!file.type && /\.(heic|heif)$/i.test(file.name)));
+  if (!IMAGE_TYPES.includes(file.type) && !isIphonePhoto) throw new Error('Choose a JPEG, PNG, or supported iPhone photo.');
   if (file.size > MAX_SOURCE_BYTES) throw new Error('Choose an image under 12 MB.');
   const url = URL.createObjectURL(file);
   const image = new Image(); image.decoding = 'async';
   try {
-    await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('This image could not be read.')); image.src = url; });
+    await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error(isIphonePhoto ? 'This browser could not open the HEIC photo. Choose a JPEG or PNG image.' : 'This image could not be read.')); image.src = url; });
     if (!image.naturalWidth || image.naturalWidth * image.naturalHeight > 40_000_000) throw new Error('Image dimensions are too large. Export a smaller image.');
     const { maxEdge, targetBytes } = uploadSettings(purpose);
     const ratio = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));

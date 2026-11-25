@@ -12,9 +12,11 @@ export function MaintenanceGlow({ rooms, floor, issues, overview, selectedRoomId
   return <g className="maintenance-glow-layer" data-glow-floor={floor} data-floor-label={overview ? floor : undefined} pointerEvents={overview ? undefined : 'none'}>
     <defs>
       {['pending','in_progress'].map(status=><radialGradient key={status} id={`${uid}-${status}`}>
-        <stop offset="0" stopColor={status==='pending'?'#ff655f':'#ffd45c'} stopOpacity=".98" />
-        <stop offset=".5" stopColor={status==='pending'?'#ff655f':'#ffd45c'} stopOpacity=".72" />
-        <stop offset="1" stopColor={status==='pending'?'#ff655f':'#ffd45c'} stopOpacity="0" />
+        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+        <stop offset="18%" stopColor={status==='pending'?'#ff2d20':'#ff9f0a'} stopOpacity="1" />
+        <stop offset="52%" stopColor={status==='pending'?'#ff4d42':'#ffb726'} stopOpacity="0.85" />
+        <stop offset="80%" stopColor={status==='pending'?'#ff6b62':'#ffd54f'} stopOpacity="0.45" />
+        <stop offset="100%" stopColor={status==='pending'?'#ff2d20':'#ff9f0a'} stopOpacity="0" />
       </radialGradient>)}
     </defs>
     {roomLayoutForFloor(floor).map(slot => {

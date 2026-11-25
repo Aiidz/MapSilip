@@ -4,7 +4,7 @@ import { contractMetrics } from './ContractOverview';
 import { manilaToday } from '../lib/room-context.mjs';
 import { DashboardBreakdown } from './DashboardBreakdown';
 import { DormOverview } from './DormOverview';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchOperationRows } from '../lib/workspace-loading';
 import { OwnerDashboardLoading } from './OwnerDashboardLoading';
 import { MetricDetails, type Metric, type MetricRecord } from './MetricDetails';
@@ -24,6 +24,7 @@ export function AnalyticsWorkspace({ children }: { children: React.ReactNode }) 
   const [data, setData] = useState<Records>();
   const [failed, setFailed] = useState(false);
   const [attempt, retry] = useState(0);
+  const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const controller = new AbortController();
     Promise.all(resources.map(async name => [name, await fetchOperationRows(name, controller.signal)] as const))
@@ -31,6 +32,13 @@ export function AnalyticsWorkspace({ children }: { children: React.ReactNode }) 
       .catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [attempt]);
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!data || !chart || !window.matchMedia('(max-width: 767px)').matches) return;
+    const month = Number(manilaToday().slice(5, 7)) - 1;
+    const current = chart.children.item(month) as HTMLElement | null;
+    if (current) chart.scrollTo({ left: current.offsetLeft - chart.offsetLeft - (chart.clientWidth - current.offsetWidth) / 2, behavior: 'instant' });
+  }, [data]);
   if (failed) return <><p role="alert">Dashboard records could not be loaded. <button onClick={() => { setFailed(false); retry(attempt + 1); }}>Retry</button></p>{children}</>;
   if (!data) return <OwnerDashboardLoading />;
   const names = new Map(data.tenants.map(row => [row.user_id, String(row.display_name)]));
@@ -55,10 +63,33 @@ export function AnalyticsWorkspace({ children }: { children: React.ReactNode }) 
   const maintenance: Metric = { title:'Maintenance Requests', value:data.maintenance.length, note:'All recorded requests', columns:repairColumns, records:data.maintenance.map(repair) };
   const contractSummary: Metric = { ...expiring, breakdown: { initialTitle: 'Expiring Soon', metrics: overview } };
   const roomCounts = counts(data.assignments.filter(row => !row.ended_on), row => String(row.room_id));
-  return <div className="owner-insights">
+  const year = Number(today.slice(0, 4));
+  const monthly = Array.from({ length: 12 }, (_, month) => ({
+    label: new Date(year, month, 1).toLocaleDateString('en-PH', { month: 'short' }),
+    count: data.maintenance.filter(row => {
+      const date = new Date(String(row.created_at));
+      if (!Number.isFinite(date.getTime())) return false;
+      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit' }).formatToParts(date);
+      return Number(parts.find(part => part.type === 'year')?.value) === year &&
+        Number(parts.find(part => part.type === 'month')?.value) === month + 1;
+    }).length,
+  }));
+  const max = Math.max(10, Math.ceil(Math.max(...monthly.map(month => month.count)) / 10) * 10);
+  return <div className="analytics-workspace owner-insights">
     <MetricDetails label="Dashboard records" metrics={[overdueAccounts, pendingPayments, maintenance, contractSummary]} />
     <DormOverview today={today} payments={data.payments} invoices={invoices} rooms={data.rooms}
       roomCounts={roomCounts} repairs={data.maintenance} tenantNames={names}>{children}</DormOverview>
+    <section className="dashboard-panel analytics-monthly" aria-labelledby="maintenance-chart-title">
+      <h2 id="maintenance-chart-title">Maintenance Requests Over Time</h2>
+      <div ref={chartRef} className="analytics-months" role="group" aria-label={`Monthly maintenance requests for ${year}`}>
+        {monthly.map(month => <div key={month.label} aria-label={`${month.label}: ${month.count} requests`} title={`${month.count} requests`}>
+          <span className="analytics-month-count" aria-hidden="true">{month.count}</span>
+          <span className="analytics-month-track" aria-hidden="true"><span style={{ height: `${month.count / max * 100}%` }} /></span>
+          <span>{month.label}</span><small className="sr-only">{month.count} requests</small>
+        </div>)}
+      </div>
+      <p>Monthly requests · {year}</p>
+    </section>
     <DashboardBreakdown total={data.invoices.length} paid={data.invoices.length - outstanding.length}
       overdue={overdue.length} concerns={data.concerns} repairs={data.maintenance} />
   </div>;

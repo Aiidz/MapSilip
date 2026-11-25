@@ -55,7 +55,7 @@ export function TenantRecoveryForm({ onSentChange }: { onSentChange?: (sent: boo
     } finally { setBusy(false); }
   }
 
-  return <form onSubmit={submit}>
+  return <form className="auth-recovery-form" onSubmit={submit}>
     {sent ? <div className="auth-recovery-confirmation" ref={confirmation} tabIndex={-1} role="status">
       <span className="auth-recovery-confirmation__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></span>
       <p>A password reset link has been requested for <strong>{email}</strong>.</p>

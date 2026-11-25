@@ -2,6 +2,7 @@
 
 import './payment-settings.css';
 import { useState, type FormEvent } from 'react';
+import { TenantFileDropzone } from './TenantFormControls';
 import { Panel } from './ui';
 
 export function PaymentQrSettings() {
@@ -26,7 +27,7 @@ export function PaymentQrSettings() {
       setMessage(method === 'POST' ? 'GCash QR saved.' : 'GCash QR disabled.');
       return true;
     } catch {
-      setMessage(method === 'POST' ? 'Could not save the QR. Use a scannable merchant PNG and try again.' : 'Could not disable the QR. Try again.');
+      setMessage(method === 'POST' ? 'Could not save the QR. Use a scannable merchant PNG or JPEG and try again.' : 'Could not disable the QR. Try again.');
       return false;
     } finally { setBusy(false); }
   }
@@ -37,7 +38,11 @@ export function PaymentQrSettings() {
       <img key={revision} src={`/api/paymentqr?v=${revision}`} alt="Active GCash merchant QR" width={280}
         style={{ display: ready ? 'block' : 'none', maxWidth: '100%', height: 'auto' }}
         onLoad={() => setReady(true)} onError={() => setReady(false)} />
-      <label>Upload QR (PNG)<input name="file" type="file" accept="image/png" required disabled={busy} /></label>
+      <fieldset className="payment-qr-upload" disabled={busy}>
+        <legend>Upload merchant QR</legend>
+        <TenantFileDropzone key={revision} name="file" accept="image/png,image/jpeg" required
+          title="Choose QR image" subtitle="PNG or JPEG · up to 2 MB" disabled={busy} />
+      </fieldset>
       <label className="payment-qr-confirm"><input type="checkbox" required disabled={busy} /><span>I verified that this QR belongs to the dormitory’s GCash merchant account.</span></label>
       <div className="payment-qr-actions">
         <button className="button button--primary" disabled={busy}>{busy ? "Working…" : "Save QR"}</button>

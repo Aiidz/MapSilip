@@ -1,3 +1,4 @@
+import { PhoneInput } from './PhoneInput';
 import { emergencyContactLimit, type parseEmergencyContact } from '../lib/emergency-contact';
 
 type Contact = ReturnType<typeof parseEmergencyContact>;
@@ -23,7 +24,7 @@ export function EmergencyContactFields({ contact, onChange, readOnly, disabled, 
           onChange={event => onChange({ ...contact, relationship: event.target.value })} />
       </label>
       <label>Phone number
-        <input type="tel" value={contact.phone} maxLength={emergencyContactLimit} readOnly={readOnly} required={required}
+        <PhoneInput value={contact.phone} maxLength={emergencyContactLimit} readOnly={readOnly} required={required}
           onChange={event => onChange({ ...contact, phone: event.target.value })} />
       </label>
     </div>

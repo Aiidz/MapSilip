@@ -1,5 +1,6 @@
 'use client';
 
+import { parseEmergencyContact } from '../lib/emergency-contact';
 import { PaymentProofViewer } from './PaymentProofViewer';
 import { CalendarDateInput } from './CalendarDateInput';
 import { genderLabel, matchesRoomPolicy } from '../lib/tenant-gender';
@@ -64,11 +65,17 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
   const [form,setForm] = useState<'room' | 'assignment' | null>(null);
   const [moveSearch,setMoveSearch] = useState('');
   const [message,setMessage] = useState('');
+  const [endingTenant,setEndingTenant] = useState<{ id: string; name: string } | null>(null);
   const [busy,setBusy] = useState(false);
   const [loading,setLoading] = useState(true);
   const load = useCallback(async () => {
     try { const [roomList,tenantList,assignmentList] = await Promise.all([allRows('rooms'),allTenantRows(),allRows('assignments')]);
-      setRooms(roomList);setSelected(current => current?.id ? roomList.find(room => room.id === current.id) ?? current : current);setTenants(tenantList);setAssignments(assignmentList);setMessage(''); }
+      setRooms(roomList);
+      setSelected(current => {
+        if (current?.user_id) return tenantList.find(tenant => tenant.user_id === current.user_id) ?? current;
+        return current?.id ? roomList.find(room => room.id === current.id) ?? current : current;
+      });
+      setTenants(tenantList);setAssignments(assignmentList);setMessage(''); }
     catch { setMessage('Room records could not be loaded.'); }
     finally { setLoading(false); }
   },[]);
@@ -117,6 +124,7 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
       || String(a.display_name ?? '').localeCompare(String(b.display_name ?? ''));
   });
   const roomResults = rooms.filter(room => String(room.room_number || '').toLowerCase().includes(search.toLowerCase()));
+  const emergencyContact = parseEmergencyContact(String(selected?.emergency_contact ?? ''));
   const selectedAssignment = selected?.user_id ? activeAssignment(selected.user_id) : undefined;
   const selectedRoom = selected?.user_id ? roomOf(selected.user_id) : undefined;
   const moveTargets = rooms
@@ -165,6 +173,24 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
     } catch (error) { setMessage(error instanceof Error ? error.message : 'The change could not be saved.'); }
     finally { setBusy(false); }
   }
+  async function endTenancy() {
+    if (busy || !endingTenant) return;
+    const tenantId = endingTenant.id;
+    setBusy(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/tenants/directory', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deactivate', id: tenantId }),
+      });
+      if (!response.ok) throw new Error();
+      setSelected(current => current?.user_id === tenantId ? { ...current, status: 'inactive' } : current);
+      setEndingTenant(null);
+      await load();
+    } catch { setMessage('Could not end the tenancy. Please try again.'); }
+    finally { setBusy(false); }
+  }
+
   function handleViewKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='tab']")];
     const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
@@ -195,7 +221,6 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
     <section className="room-summary" aria-label="Room occupancy summary">{summary.map(([title,count,detail],index) => <article
       className={`room-summary__card${index === 0 ? ' room-summary__card--highlight' : ''}`} key={String(title)}>
       <span className="room-summary__title">{title}</span><strong>{loading ? '—' : count}</strong><small>{detail}</small>
-      <span className="room-summary__mark" aria-hidden="true"><Icon name="arrow" /></span>
     </article>)}</section>
     {message && <p role="status">{message} <button type="button" onClick={() => void load()}>Refresh</button></p>}
     <div className="room-tabs" role="tablist" aria-label="Room management views" onKeyDown={handleViewKeyDown}>
@@ -237,14 +262,23 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
               <div className="room-tenant-detail__grid">
                 <section className="room-tenant-detail__tile"><h3>Personal Information</h3><dl>
                   <div><dt>Full Name</dt><dd>{value(selected.display_name)}</dd></div><div><dt>Gender</dt><dd>{genderLabel(selected.gender)}</dd></div><div><dt>Contact Number</dt><dd>{value(selected.phone)}</dd></div><div><dt>Email Address</dt><dd>{value(selected.email)}</dd></div>
-                </dl><hr /><h4>Emergency Contact</h4><dl><div><dt>Contact Details</dt><dd>{value(selected.emergency_contact)}</dd></div></dl></section>
+                </dl><hr /><h4>Emergency Contact</h4><dl><div><dt>Name</dt><dd>{value(emergencyContact.name)}</dd></div><div><dt>Relationship</dt><dd>{value(emergencyContact.relationship)}</dd></div><div><dt>Phone Number</dt><dd>{value(emergencyContact.phone)}</dd></div></dl></section>
                 <section className="room-tenant-detail__tile"><h3>Contract Details</h3><dl>
-                  <div><dt>Room Assignment</dt><dd>{selectedRoom ? `Room ${value(selectedRoom.room_number)}` : 'Unassigned'}</dd></div><div><dt>Contract Start Date</dt><dd>{value(selectedAssignment?.started_on)}</dd></div><div><dt>Contract End Date</dt><dd>{value(selectedAssignment?.contract_end_on)}</dd></div><div><dt>Monthly Rent</dt><dd>{(selectedAssignment?.contract_monthly_rent ?? selectedRoom?.monthly_rent) == null ? 'Not set' : formatPhp(selectedAssignment?.contract_monthly_rent ?? selectedRoom?.monthly_rent)}</dd></div><div><dt>Contract Status</dt><dd>{value(selected.status)}</dd></div>
+                  <div><dt>Room Assignment</dt><dd>{selectedRoom ? `Room ${value(selectedRoom.room_number)}` : 'Unassigned'}</dd></div><div><dt>Contract Start Date</dt><dd>{value(selectedAssignment?.started_on)}</dd></div><div><dt>Contract End Date</dt><dd>{value(selectedAssignment?.contract_end_on)}</dd></div><div><dt>Monthly Rent</dt><dd>{(selectedAssignment?.contract_monthly_rent ?? selectedRoom?.monthly_rent) == null ? 'Not set' : formatPhp(selectedAssignment?.contract_monthly_rent ?? selectedRoom?.monthly_rent)}</dd></div><div><dt>Account status</dt><dd>{value(selected.status)}</dd></div>
                 </dl>{selectedAssignment?.contract_attachment_id ? <PaymentProofViewer key={String(selectedAssignment.contract_attachment_id)} attachmentId={String(selectedAssignment.contract_attachment_id)} kind="contract" /> : <div className="room-tenant-detail__document"><Icon name="fileSearch" /><span>Rental contract not linked</span></div>}</section>
                 <section className="room-tenant-detail__tile"><h3>Payment History</h3>{tenantHistory.loading ? <DataSkeleton label="Loading payment history" variant="table" count={2} /> : tenantHistory.error ? <p className="room-tenant-detail__empty">Payment history is unavailable.</p> : tenantHistory.payments.length ? <div className="room-tenant-detail__table-wrap"><table><thead><tr><th>Month</th><th>Amount</th><th>Status</th></tr></thead><tbody>{tenantHistory.payments.slice(0,3).map(payment => <tr key={String(payment.id)}><td>{formatMonth(payment.created_at)}</td><td>{formatPhp(payment.amount)}</td><td><span className={`room-tenant-detail__payment-status room-tenant-detail__payment-status--${String(payment.status)}`}>{paymentStatus(payment.status)}</span></td></tr>)}</tbody></table></div> : <p className="room-tenant-detail__empty">No payment records to display.</p>}<a className="room-tenant-detail__view-all" href={`/management/payments?search=${encodeURIComponent(String(selected.display_name ?? ''))}`}>View All Records</a></section>
                 <section className="room-tenant-detail__tile"><h3>Concerns &amp; Suggestions</h3>{tenantHistory.loading ? <DataSkeleton label="Loading concerns" variant="details" count={2} /> : tenantHistory.error ? <p className="room-tenant-detail__empty">Concern history is unavailable.</p> : <div className="room-tenant-detail__stats"><div><strong>{tenantHistory.concerns.length}</strong><span>Total submissions</span></div><div><strong>{tenantHistory.concerns.filter(concern => concern.status !== 'resolved').length}</strong><span>Unresolved</span></div></div>}<a className="room-tenant-detail__view-all" href={`/management/concerns?tenant=${encodeURIComponent(String(selected.user_id))}`}>View All Records</a></section>
               </div>
-              <div className="room-tenant-detail__actions"><button className={`button ${selectedAssignment ? 'button--primary' : 'button--secondary'}`} type="button" onClick={() => setForm('assignment')}>{selectedAssignment?'Move tenant':'Assign room'}</button></div>
+              <div className="room-tenant-detail__actions">
+                {selected.status === 'active' && <button className={`button ${selectedAssignment ? 'button--primary' : 'button--secondary'}`}
+                  type="button" disabled={busy} onClick={() => setForm('assignment')}>{selectedAssignment ? 'Move tenant' : 'Assign room'}</button>}
+                {(selected.status === 'active' || selectedAssignment) && <button className="button button--secondary" type="button"
+                  disabled={busy} onClick={() => {
+                    setMessage('');
+                    setEndingTenant({ id: String(selected.user_id), name: value(selected.display_name) });
+                  }}>End tenancy</button>}
+              </div>
+              {message && <p role="status">{message}</p>}
             </div>}
         </div> : <div className="room-details-empty"><span className="room-details-empty__icon"><Icon name="fileSearch" /></span><strong>{filter==='rooms'?'No Room Selected':'No Tenant Selected'}</strong><p>Select a record from the list to view its details.</p></div>}
       </section>}</MobileDetailSurface>
@@ -271,6 +305,22 @@ export function RoomManagementWorkspace({ initialView = 'map', initialTenantId }
       variant="drawer"
     >
       {!mobile && assignmentForm}
+    </ResponsiveOverlay>
+    <ResponsiveOverlay
+      open={Boolean(endingTenant)}
+      onClose={() => { setEndingTenant(null); setMessage(''); }}
+      dismissible={!busy}
+      title="End tenancy"
+      description={endingTenant ? `End tenancy for ${endingTenant.name}?` : undefined}
+    >
+      <p>This blocks the tenant’s account access and releases their room assignment. Their records are kept.</p>
+      {message && <p role="alert">{message}</p>}
+      <div className="ps-overlay__actions">
+        <button type="button" className="button button--secondary" disabled={busy}
+          onClick={() => { setEndingTenant(null); setMessage(''); }}>Cancel</button>
+        <button type="button" className="button button--danger" disabled={busy}
+          onClick={() => void endTenancy()}>{busy ? 'Ending tenancy…' : 'End tenancy'}</button>
+      </div>
     </ResponsiveOverlay>
   </div>;
 }

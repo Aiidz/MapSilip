@@ -119,7 +119,6 @@ export function ManagementConcernsWorkspace({ initialTenantId, concernId }: { in
         </div>
         {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
         {loading && !rows.length ? <DataSkeleton label="Loading concerns" /> : rows.length ? <div className="caretaker-recent-list concerns-recent-list">{rows.map(row => {
-          const name = tenantName(row.tenant_id);
           const room = roomLabel(row.tenant_id);
           const rowStatus = label(row.status);
           return <button type="button" key={String(row.id)} className={`caretaker-request-row concerns-request-row${selected?.id === row.id ? ' is-selected' : ''}`} onClick={() => { setSelected(row); setResponding(false); }}>
@@ -127,10 +126,9 @@ export function ManagementConcernsWorkspace({ initialTenantId, concernId }: { in
               <strong>{label(row.category) === '—' ? 'Concern' : label(row.category)}</strong>
               <span className={`concern-status-badge concern-status-badge--${rowStatus}`}>{rowStatus}</span>
             </span>
-            <span className="concern-row-description">{label(row.description)}</span>
             <span className="caretaker-request-row__bottom">
-              <span>{name}{room ? ` · ${room}` : ''}</span>
-              <time>{new Date(String(row.created_at)).toLocaleDateString()}</time>
+              <span>{room || 'Room not specified'}</span>
+              <time dateTime={String(row.created_at)}>{new Date(String(row.created_at)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>
             </span>
           </button>;
         })}</div> : !error && <EmptyState title="No concerns to display" description={search || status ? 'No concerns match these filters.' : 'Resident submissions will appear here.'} icon="sparkles" />}
@@ -214,6 +212,7 @@ export function ManagementConcernsWorkspace({ initialTenantId, concernId }: { in
       open={responding && Boolean(selected)}
       onClose={() => setResponding(false)}
       title="Respond to concern"
+      className="request-response-overlay"
       description="Your response is shared with the resident."
       variant="dialog"
     >
@@ -233,8 +232,8 @@ export function ManagementConcernsWorkspace({ initialTenantId, concernId }: { in
           />
         </label>
         <div className="concerns-modal-actions">
-          <button className="button button--primary" disabled={busy}>{busy ? 'Saving…' : 'Save Response'}</button>
           <button type="button" className="button button--secondary" onClick={() => setResponding(false)}>Cancel</button>
+          <button type="submit" className="button button--primary" disabled={busy}>{busy ? 'Saving…' : 'Save Response'}</button>
         </div>
       </form>}
     </ResponsiveOverlay>

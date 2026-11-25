@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ResponsiveOverlay } from './ResponsiveOverlay';
 import { DataSkeleton } from './DataSkeleton';
 import { Icon } from './Icon';
+import { contractEndDate } from '../lib/contract-dates.mjs';
 import { manilaToday } from '../lib/room-context.mjs';
 import { reviewRoomOptions, type ReviewRoom } from '../lib/access-review.mjs';
 import { prepareUpload, uploadPreparedAttachment } from '../lib/uploads/client';
@@ -39,7 +40,8 @@ export function AccountRequestsDialog({ open }: { open: boolean }) {
   const [roomSearch, setRoomSearch] = useState('');
   const [floor, setFloor] = useState('all');
   const [startedOn, setStartedOn] = useState(manilaToday);
-  const [endOn, setEndOn] = useState('');
+  const [endOverride, setEndOverride] = useState<string | null>(null);
+  const endOn = endOverride ?? contractEndDate(startedOn);
   const [note, setNote] = useState('');
   const [contract, setContract] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
@@ -80,7 +82,7 @@ export function AccountRequestsDialog({ open }: { open: boolean }) {
       await discardUpload();
       const preferred = request && reviewRoomOptions(rooms, assignments, request.gender)
         .find(room => room.id === request.preferred_room_id && room.eligible);
-      setSelected(request); setRoomId(preferred ? preferred.id : ''); setRoomSearch(''); setFloor('all'); setDecision('approved'); setStartedOn(manilaToday()); setEndOn(''); setNote(''); setContract(null); setPreview(''); setError('');
+      setSelected(request); setRoomId(preferred ? preferred.id : ''); setRoomSearch(''); setFloor('all'); setDecision('approved'); setStartedOn(manilaToday()); setEndOverride(null); setNote(''); setContract(null); setPreview(''); setError('');
       window.requestAnimationFrame(() => (request ? detailHeading : queueHeading).current?.focus());
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not switch requests.'); }
     finally { setBusy(false); }
@@ -102,7 +104,7 @@ export function AccountRequestsDialog({ open }: { open: boolean }) {
     event.preventDefault(); if (!selected || locked || loadError) return;
     if (decision === 'approved' && !chosen) { setError('Select an eligible room before approving.'); return; }
     if (decision === 'approved') {
-      if (!endOn || endOn < startedOn) { setError('Enter an end date on or after the start date.'); return; }
+      if (!contractEndDate(startedOn, endOn ?? '')) { setError('Choose valid contract dates. The end date must be on or after the start date.'); return; }
       if (!contract && !uploadedContract.current &&
           !window.confirm('No rental contract is attached. Approve this tenant request anyway?')) return;
     }
@@ -113,9 +115,9 @@ export function AccountRequestsDialog({ open }: { open: boolean }) {
       if (decision === 'rejected') await discardUpload();
       const response = await fetch('/api/account-requests/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         id: selected.id, decision, room_id: decision === 'approved' ? roomId : null,
-        started_on: decision === 'approved' ? startedOn : null, note: note.trim() || null,
+        started_on: decision === 'approved' ? startedOn : null,
+        contract_end_on: decision === 'approved' ? endOn : null, note: note.trim() || null,
         contract_attachment_id: decision === 'approved' ? uploadedContract.current : null,
-        contract_end_on: decision === 'approved' ? endOn : null,
       }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Review could not be saved. The room may have changed; refresh the room list and try again.');
@@ -152,7 +154,7 @@ export function AccountRequestsDialog({ open }: { open: boolean }) {
                   <div className="access-review__floors" role="group" aria-label="Filter rooms by floor">{['all', ...new Set(rooms.map(room => room.floor_label))].map(value => <button key={value} type="button" aria-pressed={floor === value} onClick={() => setFloor(value)}>{value === 'all' ? 'All floors' : value}</button>)}</div>
                   <fieldset className="access-review__rooms"><legend className="sr-only">Available room selection</legend>{visibleRooms.map(room => <label key={room.id} className={`access-review__room${!room.eligible ? ' is-unavailable' : ''}`}><input type="radio" name="room_id" value={room.id} checked={roomId === room.id} disabled={!room.eligible} onChange={() => setRoomId(room.id)} /><span><strong>Room {room.room_number}{selected.preferred_room_id === room.id ? ' · Preferred' : ''}</strong><small>{room.floor_label} · {room.gender_policy === 'male' ? 'Boys only' : room.gender_policy === 'female' ? 'Girls only' : 'Unrestricted'}</small><span>{room.reason || `${room.vacancies} of ${room.capacity} slots available`}</span></span><span className="access-review__rent"><strong>{php(room.monthly_rent)}</strong><small>per tenant / month</small></span></label>)}{!visibleRooms.length && <p className="access-review__empty">No rooms match these filters.</p>}</fieldset>
                 </section>
-                <section className="access-review__contract"><h4>Rental contract</h4><p>Attach an original PDF or readable image for the tenant. Uploading a contract is optional.</p><div className="access-review__dates"><label>Start date<CalendarDateInput value={startedOn} onValueChange={setStartedOn} required /></label><label>End date<CalendarDateInput value={endOn} min={startedOn} onValueChange={setEndOn} required /></label></div>
+                <section className="access-review__contract"><h4>Rental contract</h4><p>Attach an original PDF or readable image for the tenant. Uploading a contract is optional.</p><div className="access-review__dates"><label>Start date<CalendarDateInput value={startedOn} onValueChange={value => { setStartedOn(value); setEndOverride(null); }} required /></label><label>End date<CalendarDateInput value={endOn ?? ''} onValueChange={setEndOverride} min={startedOn} required /></label></div>
                   <label className="access-review__upload"><Icon name="fileSearch" /><span><strong>{preparing ? 'Preparing image…' : contract ? 'Replace contract file' : 'Choose contract file'}</strong><small>PDF, JPEG or PNG · originals preserved · up to 2 MB</small></span><input type="file" accept="application/pdf,image/jpeg,image/png" onChange={event => void chooseContract(event)} disabled={locked} /></label>
                   {contract && <div className="access-review__preview">{/* Local object URL only; no private document leaves the browser before submission. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
