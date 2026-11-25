@@ -8567,7 +8567,7 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
 .audit-trail-table td:is(:nth-child(2), :nth-child(4)) { max-width: 170px; font-size: .75rem; }
 .audit-trail-action { display: inline-block; padding: 4px 8px; border-radius: 8px; background: var(--brand-soft); color: var(--brand-ink); font-weight: 650; }
 .audit-trail-panel > :is(p, nav) { margin: 0; padding: 16px 18px; }
-.audit-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.audit-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .audit-pagination-btn, .audit-pagination-current { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--text); font-weight: 650; font-size: .9rem; font-variant-numeric: tabular-nums; text-decoration: none; }
 .audit-pagination-btn:hover:not(.is-disabled) { border-color: var(--brand-ink); }
 .audit-pagination-btn.is-disabled { opacity: .45; cursor: default; }
