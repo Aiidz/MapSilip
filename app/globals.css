@@ -8561,6 +8561,9 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
 .audit-trail-table th { background: var(--surface-soft); }
 .audit-trail-table :is(td, th) { padding: 14px 16px; }
 .audit-trail-table td:nth-child(1) { white-space: nowrap; }
+.audit-trail-time { display: grid; gap: 2px; }
+.audit-trail-time strong { font-size: .875rem; font-weight: 650; color: var(--text); }
+.audit-trail-time span { font-size: .75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .audit-trail-table td:is(:nth-child(2), :nth-child(4)) { max-width: 170px; font-size: .75rem; }
 .audit-trail-action { display: inline-block; padding: 4px 8px; border-radius: 8px; background: var(--brand-soft); color: var(--brand-ink); font-weight: 650; }
 .audit-trail-panel > :is(p, nav) { margin: 0; padding: 16px 18px; }

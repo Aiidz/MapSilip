@@ -20,8 +20,11 @@ const tenancyCategory = { label: 'Rooms & tenant access', pattern: 'room.%,tenan
 function categoryFilter(pattern: string) {
   return pattern.split(',').map(prefix => `action.like.${prefix}`).join(',');
 }
-const dateTime = new Intl.DateTimeFormat('en-PH', {
-  dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila',
+const dateFormat = new Intl.DateTimeFormat('en-US', {
+  month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila',
+});
+const timeFormat = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Manila',
 });
 
 export default async function AuditTrail({ searchParams }: {
@@ -54,6 +57,33 @@ export default async function AuditTrail({ searchParams }: {
 
   const rows = Array.isArray(data) ? data : [];
 
+  const [{ data: roomsData }, { data: tenantsData }, { data: assignmentsData }] = rows.length
+    ? await Promise.all([
+        client.from('rooms').select('id,room_number'),
+        client.from('tenant_profiles').select('user_id,display_name'),
+        client.from('room_assignments').select('tenant_id,room_id').eq('status', 'active'),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }];
+
+  const roomById = new Map((roomsData ?? []).map(r => [r.id, r.room_number]));
+  const tenantNameById = new Map((tenantsData ?? []).map(t => [t.user_id, t.display_name]));
+  const tenantRoomById = new Map((assignmentsData ?? []).map(a => [a.tenant_id, roomById.get(a.room_id)]));
+
+  const resolveActor = (actorId: string | null) => {
+    if (!actorId) return 'System';
+    return tenantNameById.get(actorId) ?? 'Owner / Caretaker';
+  };
+
+  const resolveRoom = (recordId: string, actorId: string | null) => {
+    const directRoom = roomById.get(recordId);
+    if (directRoom) return `Room ${directRoom}`;
+    if (actorId) {
+      const actorRoom = tenantRoomById.get(actorId);
+      if (actorRoom) return `Room ${actorRoom}`;
+    }
+    return '—';
+  };
+
   const href = (next: number) => '/management/audit?' + new URLSearchParams({ page: String(next), search, category, role });
 
   const cards = [
@@ -82,12 +112,12 @@ export default async function AuditTrail({ searchParams }: {
         : !rows.length ? <p>No audit events on this page.</p>
         : <div className="operational-table-wrap audit-trail-table" tabIndex={0} role="region" aria-label="Audit events">
           <table className="operational-table">
-            <thead><tr><th scope="col">Date and time</th><th scope="col">Actor ID</th><th scope="col">Action</th><th scope="col">Record ID</th><th scope="col">Details</th></tr></thead>
+            <thead><tr><th scope="col">Date and time</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Room</th><th scope="col">Details</th></tr></thead>
             <tbody>{rows.map(event => <tr key={event.id}>
-              <td><time dateTime={event.created_at}>{dateTime.format(new Date(event.created_at))}</time></td>
-              <td>{event.actor_id ?? 'System'}</td>
+              <td><time className="audit-trail-time" dateTime={event.created_at}><strong>{dateFormat.format(new Date(event.created_at))}</strong><span>{timeFormat.format(new Date(event.created_at))}</span></time></td>
+              <td>{resolveActor(event.actor_id)}</td>
               <td><span className="audit-trail-action">{event.action.replace(/[._]/g, ' ')}</span></td>
-              <td><code>{event.record_id}</code></td>
+              <td>{resolveRoom(event.record_id, event.actor_id)}</td>
               <td>{event.reason || '—'}</td>
             </tr>)}</tbody>
           </table>
