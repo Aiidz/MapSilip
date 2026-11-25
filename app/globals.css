@@ -4390,7 +4390,7 @@ button.room-context__person:hover, button.room-context__person:focus-visible { b
   margin: 22px 0 18px;
   background: rgb(48 71 94 / 20%);
 }
-.auth-recovery-link { display: block; margin: -8px 0 8px; color: var(--charcoal); text-align: right; font-size: 13px; text-decoration: none; }
+.auth-recovery-link { display: block; margin: 12px 0 8px; color: var(--charcoal); text-align: center; font-size: 13px; text-decoration: none; }
 .auth-recovery-link:hover { text-decoration: underline; }
 .auth-page--login .auth-switch {
   margin: 0 0 18px;
