@@ -8690,3 +8690,9 @@ body:has(.onboarding-overlay[open]) :is(.mobile-nav, .mobile-topbar, .tenant-too
 .auth-page--login .auth-form-side { background: rgba(248, 250, 252, 0.92); backdrop-filter: blur(18px); }
 .auth-page--refined.auth-page--request .auth-form-side { background: rgba(248, 250, 252, 0.92); }
 .auth-page--refined.auth-page--request .auth-brand-footer .auth-brand { margin-top:0; }
+.auth-page--login .auth-field input:focus,
+.auth-page--login .auth-field input:focus-visible {
+  outline: 0;
+  border: 2px solid #b9363c;
+  box-shadow: none;
+}
