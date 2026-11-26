@@ -56,6 +56,11 @@ export default async function AuditTrail({ searchParams }: {
   ]);
 
   const rows = Array.isArray(data) ? data : [];
+  const actorIds = [...new Set(rows.map(row => row.actor_id).filter((id): id is string => Boolean(id)))];
+  const { data: actorRoles } = actorIds.length
+    ? await client.rpc('audit_actor_roles', { actor_ids: actorIds })
+    : { data: [] };
+  const staffRoleById = new Map((actorRoles ?? []).map((staff: { user_id: string; role: string }) => [staff.user_id, staff.role]));
 
   const [{ data: roomsData }, { data: tenantsData }, { data: assignmentsData }, { data: maintenanceData }, { data: paymentsData }, { data: invoicesData }, { data: concernsData }] = rows.length
     ? await Promise.all([
@@ -80,7 +85,8 @@ export default async function AuditTrail({ searchParams }: {
 
   const resolveActor = (actorId: string | null) => {
     if (!actorId) return 'System';
-    return tenantNameById.get(actorId) ?? 'Owner / Caretaker';
+    const role = staffRoleById.get(actorId);
+    return role === 'owner' ? 'Owner' : role === 'caretaker' ? 'Caretaker' : tenantNameById.get(actorId) ?? 'Unknown user';
   };
 
   const resolveRoom = (recordId: string, actorId: string | null) => {
@@ -123,10 +129,10 @@ export default async function AuditTrail({ searchParams }: {
         : !rows.length ? <p>No audit events on this page.</p>
         : <div className="operational-table-wrap audit-trail-table" tabIndex={0} role="region" aria-label="Audit events">
           <table className="operational-table">
-            <thead><tr><th scope="col">Date and time</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Room</th><th scope="col">Details</th></tr></thead>
+            <thead><tr><th scope="col">Date and time</th><th scope="col">User</th><th scope="col">Action</th><th scope="col">Room</th><th scope="col">Details</th></tr></thead>
             <tbody>{rows.map(event => <tr key={event.id}>
               <td><time className="audit-trail-time" dateTime={event.created_at}><strong>{dateFormat.format(new Date(event.created_at))}</strong><span>{timeFormat.format(new Date(event.created_at))}</span></time></td>
-              <td>{resolveActor(event.actor_id)}</td>
+              <td><strong>{resolveActor(event.actor_id)}</strong></td>
               <td><span className="audit-trail-action">{event.action.replace(/[._]/g, ' ')}</span></td>
               <td>{resolveRoom(event.record_id, event.actor_id)}</td>
               <td>{event.reason || '—'}</td>
