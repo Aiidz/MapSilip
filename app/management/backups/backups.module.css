@@ -114,3 +114,13 @@
 @media (max-width: 860px) {
   .topGrid, .lowerGrid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Keep destination cards compact and place scheduling in its own workspace. */
+.automationPanel { padding: clamp(1rem, 2vw, 1.375rem); margin-block: 1rem; }
+.automationPanel .schedule:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.automationPanel .editor { margin-top: 1.25rem; max-width: 48rem; gap: 1.1rem; }
+.automationPanel .segments { padding: 4px; gap: 4px; }
+.automationPanel .segments span { min-height: 44px; }
+.automationPanel .scheduleFields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.automationPanel .scheduleFields input { min-height: 44px; }
+@media (max-width: 480px) { .automationPanel .scheduleFields { grid-template-columns: 1fr; } .months { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

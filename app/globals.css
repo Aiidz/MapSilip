@@ -8296,6 +8296,11 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
 }
 
 .dashboard-record-drawer .metric-records { gap:14px; }
+.metric-breakdown { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.metric-breakdown button { display:grid; gap:4px; align-content:start; min-height:64px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-control); background:var(--surface); color:var(--text); text-align:start; font:inherit; cursor:pointer; }
+.metric-breakdown button[aria-pressed="true"] { border-color:var(--brand); background:var(--brand-soft); }
+.metric-breakdown button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+.metric-breakdown strong { font-size:1.25rem; }
 .metric-tools { display:flex; flex-wrap:wrap; gap:8px; }
 .metric-tools label { flex:1 1 160px; position:relative; }
 .metric-tools label svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); width:17px; }
@@ -8303,8 +8308,17 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
 .metric-tools select { text-transform:capitalize; }
 .metric-count,.metric-list dt { color:var(--text-muted); font-size:.8rem; }
 .metric-list { list-style:none; padding:0; margin:0; display:grid; gap:12px; }
-.metric-list li { padding:16px; background:var(--surface); border:1px solid var(--border-strong); border-radius:14px; }
+.metric-maintenance-list { display:grid; gap:10px; padding:12px; border:1px solid var(--border); border-radius:14px; background:var(--surface-soft); }
+.metric-maintenance-list__items { display:grid; gap:8px; list-style:none; padding:0; margin:0; }
+.metric-maintenance-row { min-height:150px; padding:16px; gap:12px; text-decoration:none !important; }
+.metric-maintenance-row .caretaker-request-row__top > strong { white-space:normal; overflow-wrap:anywhere; }
+.metric-maintenance-row .caretaker-request-row__bottom { flex-wrap:wrap; }
+.metric-maintenance-row__description { display:grid; gap:5px; padding-top:10px; border-top:1px solid var(--border); color:var(--text) !important; font-size:.875rem; line-height:1.5; overflow-wrap:anywhere; }
+.metric-maintenance-row__description > span { color:var(--text-muted); font-size:.75rem; }
+.metric-list li { min-height:150px; padding:16px; background:var(--surface); border:1px solid var(--border-strong); border-radius:12px; }
 .metric-list li a { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; text-decoration:none; color:var(--text); overflow-wrap:anywhere; }
+.metric-record-identity { display:flex; min-width:0; align-items:center; gap:10px; }
+.metric-record-avatar { position:relative; display:grid; flex:0 0 40px; width:40px; height:40px; place-items:center; overflow:hidden; border:1px solid var(--border); border-radius:50%; background:var(--surface-soft); color:var(--brand-ink); font-size:.75rem; font-weight:750; }
 .metric-list li a:hover strong { text-decoration:underline; }
 .metric-list li a svg { flex:none; width:18px; }
 .metric-list dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; margin:5px 0 0; padding-top:12px; border-top:1px solid var(--border); }
@@ -8312,6 +8326,9 @@ button > .close-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px
 .metric-description { grid-column:1/-1; }
 .metric-status { display:inline-block; padding:3px 8px; border-radius:6px; background:var(--surface-soft); text-transform:capitalize; }
 .metric-empty { text-align:center; padding:32px 12px; color:var(--text-muted); }
+.metric-maintenance-list .metric-empty { display:flex; min-height:240px; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:32px 20px; }
+.metric-maintenance-list .metric-empty svg { width:36px; height:36px; flex:none; }
+.metric-maintenance-list .metric-empty p { margin:0; font-size:1rem; line-height:1.5; }
 .metric-empty button { padding:10px 16px; border-radius:8px; background:var(--surface-soft); color:var(--text); border:1px solid var(--border); }
 .dorm-breakdowns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.45fr); gap:clamp(12px,1.5vw,22px); }
 .dorm-report { min-width:0; padding:clamp(18px,2.4vw,34px); border-radius:16px; background:var(--surface); border:1px solid var(--border); }

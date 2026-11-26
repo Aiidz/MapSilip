@@ -85,7 +85,9 @@ export async function BackupWorkspace({ userId, drive: result }: { userId: strin
               ? 'The backup registry is unavailable.' : connected
                 ? 'The backup worker needs to prepare a private Drive folder.' : 'Connect your Google account to schedule backups.'}
           </p>}
-          {connected && <>
+        </Panel>
+      </div>
+      {connected && <section className={`panel ${styles.automationPanel}`} aria-label="Automatic backups">
             <div className={styles.schedule}>
               <div><strong>Automatic backups</strong><p className={styles.hint}>
                 {automation ? schedule?.enabled ? schedule.frequency : 'Off' : 'Unavailable'}
@@ -108,9 +110,7 @@ export async function BackupWorkspace({ userId, drive: result }: { userId: strin
               </div>
               <BackupHistoryRefresh active={running.has(latest.state)} />
             </div>}
-          </>}
-        </Panel>
-      </div>
+      </section>}
     </div>
   );
 }

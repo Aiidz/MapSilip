@@ -98,7 +98,7 @@ async function main() {
   const timeout = AbortSignal.timeout(60 * 60 * 1000);
   await registry.connect();
   try {
-    if (bootstrap) {
+    {
       const { rows: [grant] } = await registry.query(
         "select account_id,envelope,staging_root_id from mapsilip_backup.drive_connections where owner_id=$1 and state='connected'",
         [ownerId],
@@ -132,7 +132,8 @@ async function main() {
         id = reserved.rows[0]?.staging_root_id;
         if (!id) throw new Error('Drive connection changed');
       }
-      return { driveArchiveRootId: await ensureDriveArchiveRoot(request, { id, ownerId: grant.account_id }) };
+      await ensureDriveArchiveRoot(request, { id, ownerId: grant.account_id });
+      if (bootstrap) return { driveArchiveRootId: id };
     }
     try {
       await registry.query('select capture_seal_sha256,local_receipt_sha256 from mapsilip_backup.jobs where owner_id=$1 limit 0', [ownerId]);
@@ -178,10 +179,9 @@ async function main() {
     }
     const heartbeat = await registry.query(
       `update mapsilip_backup.drive_connections set worker_seen_at=now()
-       where owner_id=$1 and state='connected' and staging_root_id=$2`,
-      [ownerId, setting('BACKUP_DRIVE_ROOT_ID')],
+       where owner_id=$1 and state='connected' and staging_root_id is not null`, [ownerId],
     );
-    if (heartbeat.rowCount !== 1) throw new Error('Preflight: BACKUP_DRIVE_ROOT_ID must match the owner staging folder');
+    if (heartbeat.rowCount !== 1) throw new Error('Preflight: Drive connection unavailable');
     return await runBackupJob(registry, {
       ownerId, signingKey, verificationKey,
       async collect(job, heartbeat) {
@@ -223,7 +223,7 @@ async function main() {
         if (receipt.rowCount !== 1) throw new Error('Delivery receipt registry write failed');
       },
       async drive(job) {
-        const { rows: [connection] } = await registry.query(`select account_id,envelope
+        const { rows: [connection] } = await registry.query(`select account_id,envelope,staging_root_id
           from mapsilip_backup.drive_connections where owner_id=$1 and state='connected'`, [job.owner_id]);
         if (!connection) throw new Error('Drive connection unavailable');
         const google = { clientId: setting('GOOGLE_DRIVE_CLIENT_ID'), clientSecret: setting('GOOGLE_DRIVE_CLIENT_SECRET') };
@@ -238,12 +238,13 @@ async function main() {
         const request = async (url, options) => {
           const locked = await registry.query(`select 1 from mapsilip_backup.jobs j
             join mapsilip_backup.drive_connections c on c.owner_id=j.owner_id and c.state='connected'
-            where j.id=$1 and j.fence=$2 and j.lease_until>now() and c.account_id=$3`, [job.id, job.fence, connection.account_id]);
+            where j.id=$1 and j.fence=$2 and j.lease_until>now() and c.account_id=$3 and c.staging_root_id=$4`, [job.id, job.fence, connection.account_id, connection.staging_root_id]);
           if (!locked.rowCount || new URL(url).origin !== 'https://www.googleapis.com') throw new Error('Drive request no longer authorized');
           return fetch(url, { ...options, headers: { ...options.headers, Authorization: 'Bearer ' + token.accessToken },
             signal: AbortSignal.timeout(30000) });
         };
-        const rootId = setting('BACKUP_DRIVE_ROOT_ID');
+        const rootId = connection.staging_root_id;
+        if (!rootId) throw new Error('Drive archive root unavailable');
         return { request, rootId, ownerId: connection.account_id,
           registry: transferRegistry(registry, job, {
             async allocateId() {

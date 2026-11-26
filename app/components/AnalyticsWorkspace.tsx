@@ -54,13 +54,13 @@ export function AnalyticsWorkspace({ children }: { children: React.ReactNode }) 
   const tenant = (row: Row) => names.get(row.tenant_id) ?? 'Tenant';
   const repair = (row: Row): MetricRecord => {
     const status = String(row.status).replaceAll('_',' ');
-    return { id:String(row.id), cells:[String(row.category), rooms.get(row.room_id) ?? '—', status, String(row.description)], status,
+    return { id:String(row.id), cells:[String(row.category), rooms.get(row.room_id) ?? '—', status, String(row.description)], status, createdAt: String(row.created_at),
       href:'/management/maintenance?roomId=' + encodeURIComponent(String(row.room_id)) };
   };
   const repairColumns = ['Issue', 'Room', 'Status', 'Description'];
-  const overdueAccounts: Metric = { title:'Overdue Accounts', value:new Set(overdue.map(row => row.tenant_id)).size, note:'Tenants with outstanding rent', columns:['Tenant','Outstanding','Due date'], records:overdue.map(row => ({id:String(row.id), cells:[tenant(row), money((Math.round(Number(row.amount)*100)-(paid.get(row.id) ?? 0))/100,row.currency), String(row.due_on)], href:tenantLink(row.tenant_id)})) };
-  const pendingPayments: Metric = { title:'Pending Payments', value:pending.length, note:'Awaiting verification', columns:['Tenant','Amount','Reference','Submitted'], records:pending.map(row => ({id:String(row.id),cells:[tenant(row),money(Number(row.amount), invoices.get(row.invoice_id)?.currency),String(row.reference_number ?? '—'),String(row.created_at).slice(0,10)],href:'/management/payments?search='+encodeURIComponent(String(row.reference_number || tenant(row)))})) };
-  const maintenance: Metric = { title:'Maintenance Requests', value:data.maintenance.length, note:'All recorded requests', columns:repairColumns, records:data.maintenance.map(repair) };
+  const overdueAccounts: Metric = { title:'Overdue Accounts', value:new Set(overdue.map(row => row.tenant_id)).size, note:'Tenants with outstanding rent', columns:['Tenant','Outstanding','Due date'], records:overdue.map(row => ({id:String(row.id), tenantId:typeof row.tenant_id === 'string' ? row.tenant_id : undefined, cells:[tenant(row), money((Math.round(Number(row.amount)*100)-(paid.get(row.id) ?? 0))/100,row.currency), String(row.due_on)], href:tenantLink(row.tenant_id)})) };
+  const pendingPayments: Metric = { title:'Pending Payments', value:pending.length, note:'Awaiting verification', columns:['Tenant','Amount','Reference','Submitted'], records:pending.map(row => ({id:String(row.id),tenantId:typeof row.tenant_id === 'string' ? row.tenant_id : undefined,cells:[tenant(row),money(Number(row.amount), invoices.get(row.invoice_id)?.currency),String(row.reference_number ?? '—'),String(row.created_at).slice(0,10)],href:'/management/payments?search='+encodeURIComponent(String(row.reference_number || tenant(row)))})) };
+  const maintenance: Metric = { title:'Maintenance Requests', value:data.maintenance.length, note:'All recorded requests', kind:'maintenance', columns:repairColumns, records:data.maintenance.map(repair) };
   const contractSummary: Metric = { ...expiring, breakdown: { initialTitle: 'Expiring Soon', metrics: overview } };
   const roomCounts = counts(data.assignments.filter(row => !row.ended_on), row => String(row.room_id));
   const year = Number(today.slice(0, 4));

@@ -22,7 +22,7 @@ export function contractMetrics(assignments: Row[], tenants: Row[], rooms: Row[]
   const newContracts = assignments.filter(row => row.contract_end_on && String(row.started_on).startsWith(thisMonth) && String(row.started_on) <= today);
   function metric(title: string, note: string, rows: Row[]): Metric {
     return { title, note, value: rows.length, columns: ['Tenant', 'Room', 'Start date', 'End date'], records: rows.map(row => ({
-      id: String(row.id),
+      id: String(row.id), tenantId: typeof row.tenant_id === 'string' ? row.tenant_id : undefined,
       cells: [names.get(row.tenant_id) ?? 'Tenant', roomNames.get(row.room_id) ?? '—', String(row.started_on), String(row.contract_end_on)],
       href: '/management/rooms?tenant=' + encodeURIComponent(String(row.tenant_id)),
     })) };
