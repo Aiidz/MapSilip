@@ -198,7 +198,7 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
       open={creating}
       onClose={() => setCreating(false)}
       title="Create invoice"
-      description="Bill a tenant for a coverage period. Amounts are stored in the selected currency."
+      description="Monthly rent is due by the 7th. A prorated first-month bill is due on its coverage start date."
       variant="drawer"
     >
       <form className="operational-form payment-detail-form" onSubmit={createInvoice}>
@@ -206,6 +206,7 @@ export function ManagementPaymentsWorkspace({ initialSearch = '' }: { initialSea
         <label>Coverage start<CalendarDateInput name="coverage_start" required /></label>
         <label>Coverage end (six months minus one day)<CalendarDateInput name="coverage_end" required /></label>
         <label>Due date<CalendarDateInput name="due_on" required /></label>
+        <p className="rent-due-policy-hint">For monthly rent, the system sets full-month invoices to the 7th and prorated first-month invoices to their start date.</p>
         <label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label>
         <label>Currency code<input name="currency" maxLength={3} minLength={3} required /></label>
         <label>Note<input name="note" maxLength={500} /></label>

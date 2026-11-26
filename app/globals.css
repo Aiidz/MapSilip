@@ -4544,6 +4544,7 @@ button.room-context__person:hover, button.room-context__person:focus-visible { b
 .operational-tools input, .operational-tools select, .operational-form input, .operational-form select, .operational-form textarea,
 .operational-invitation input { width: 100%; min-height: 2.4rem; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: .5rem .7rem; background: var(--surface); color: inherit; }
 .operational-form { display: grid; gap: .8rem; max-width: 42rem; margin: 1rem 0; }
+.rent-due-policy-hint { margin: -.45rem 0 0; color: var(--text-muted); font-size: .82rem; line-height: 1.45; }
 .operational-form textarea { min-height: 6rem; }
 .operational-actions { margin: .8rem 0; }
 .operational-invitation { overflow-wrap: anywhere; }
